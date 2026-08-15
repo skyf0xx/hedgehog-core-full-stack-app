@@ -1,0 +1,9 @@
+node_modules
+workspace/node_modules
+workspace/.nx
+workspace/apps/*/node_modules
+workspace/apps/*/dist
+workspace/apps/*/.next
+workspace/apps/*/out-tsc
+workspace/packages/*/node_modules
+workspace/packages/*/dist

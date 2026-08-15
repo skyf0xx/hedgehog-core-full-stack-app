@@ -1,0 +1,41 @@
+{
+  "name": "@skyf0xx/hedgehog-core-full-stack-app",
+  "version": "1.0.0",
+  "description": "Hedgehog's full-stack-app core: an Nx/pnpm/NestJS/Next.js workspace, backend-first domain module build discipline, and the agents and skills that drive it.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skyf0xx/hedgehog-core-full-stack-app.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "workspace",
+    "agents",
+    "skills",
+    "vendor-skills",
+    "CLAUDE.core.md",
+    "hedgehog-core.yaml",
+    "!workspace/node_modules/**",
+    "!workspace/.nx/**",
+    "!workspace/apps/*/node_modules/**",
+    "!workspace/apps/*/dist/**",
+    "!workspace/apps/*/.next/**",
+    "!workspace/apps/*/out-tsc/**",
+    "!workspace/packages/*/node_modules/**",
+    "!workspace/packages/*/dist/**"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "keywords": [
+    "hedgehog-core",
+    "hedgehog",
+    "claude-code",
+    "nx",
+    "nestjs",
+    "nextjs"
+  ],
+  "license": "MIT"
+}
