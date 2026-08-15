@@ -507,7 +507,54 @@ Before starting Phase B for a module, confirm:
 - The contract is callable and typed (contract tests pass).
 
 Use the `reviewer` agent for this — it checks what the mechanical gate
-can't (port discipline, FK-by-ID discipline, contract shape).
+can't. Everything lefthook already enforces (typecheck, lint, unit test
+pass/fail) is out of scope for that review; these are the checks this
+core adds on top of it, and the list `reviewer` works from at a
+full-stack-app phase boundary:
+
+- **Port discipline**: a module's port interface and its Drizzle adapter
+  share one lib, so the tag graph has to allow `type:service →
+  type:adapter` and the real check is at the import level: does the
+  service import the port from the repository lib's entry point, or the
+  concrete `*.adapter`? Does anything in `apps/api` outside a
+  `*.module.ts` construct an adapter? `eslint-base.js`'s
+  `no-restricted-imports` rules catch the named cases — read the actual
+  imports anyway, since an adapter file not named `*.adapter.ts` opts
+  itself out of the rule. Use `nx show project <name> --json` (per the
+  `nx-workspace` skill) to check a project's resolved tags and
+  dependencies rather than reading `project.json` directly — it only
+  holds partial configuration, not tags inferred by plugins.
+- **FK-by-ID discipline**: does a module's repository/service reach into
+  another module's tables directly, or only resolve related entities by
+  ID at the contract/controller layer (cross-module references, above)?
+- **Module granularity**: is this actually one table = one module, or has
+  scope crept — two tables sharing a service, or a junction table
+  absorbed into one side's module instead of standing alone?
+- **Contract shape**: does the Zod/ts-rest contract match what Phase B
+  will need, or does it leak implementation detail that will force a
+  breaking change once hooks are built against it?
+- **Phase leakage**: any hook or screen code, or frontend-shaped
+  reasoning, showing up before this module has a `feat(<module>): api`
+  commit?
+- **Queue seam**: if the Queue add-on is on and queue infra was added,
+  does the operation genuinely need async (long-running, retries,
+  fan-out) — or was the seam reached for out of habit? If the Queue
+  add-on is off (check `.hedgehog/addons.yaml`'s `queue.on`), there should
+  be no `apps/worker` and no queue infra at all for this module — queue
+  infra appearing anyway is itself a finding, not something to review the
+  contents of.
+- **Intra-step conventions**: does the module follow the conventions the
+  gate can't see (Intra-step conventions, above)? Check against that list
+  rather than re-deriving it. A module drifting from them is a Warning
+  unless it breaks Phase B.
+- **Security/correctness**: unvalidated input reaching a Drizzle query
+  outside the Zod-validated contract boundary, secrets, obvious logic
+  errors — same bar any reviewer would apply, scoped to what's new since
+  the last review point.
+
+The review point is the last `feat(<module>): api` commit; `git diff`
+from there, then read every layer of the module rather than the diff
+alone — boundary violations are invisible from a diff.
 
 Before starting Phase A for a module, confirm it's inside the stated scope
 boundary from planning intake (`planner`). If not, stop and ask — and if
