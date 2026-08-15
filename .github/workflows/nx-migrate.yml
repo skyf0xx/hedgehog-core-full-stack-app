@@ -1,0 +1,101 @@
+name: Nx migrate
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: github.repository == 'skyf0xx/hedgehog-core-full-stack-app'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - run: corepack enable
+
+      - run: cd workspace && pnpm install --frozen-lockfile
+
+      # nx migrate resolves nx + every @nx/* plugin to one mutually
+      # compatible version set (Nx's own coupled-upgrade tool) and
+      # applies the codemods each migration needs, then --run-migrations
+      # applies them and deletes the generated migrations.json.
+      - run: cd workspace && npx nx migrate latest
+
+      - run: cd workspace && npx nx migrate --run-migrations
+
+      - run: cd workspace && pnpm install --no-frozen-lockfile
+
+      - id: diff
+        run: |
+          if git diff --quiet -- workspace; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx nx run-many --target=lint,typecheck,test,build --all
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx playwright install --with-deps
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx nx run-many --target=e2e --all
+
+      # Proves the migration didn't just leave existing apps working —
+      # it must also leave every layer generator producing code that
+      # still typechecks and builds, since scaffolding a fresh domain
+      # module is the first thing a consuming project does after
+      # `hedgehog init`. Runs in dependency order (schema before
+      # contract before repository/service before controller/hook
+      # before screen) and the generated module is discarded, not
+      # committed — this is a smoke test, not a fixture.
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          FIELDS="title:string(500),done:boolean"
+          npx nx g @hedgehog/generators:schema ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:contract ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:repository ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:service ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:hook ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:screen ci-smoke-test --no-interactive
+          npx nx run-many --target=typecheck,build --projects=api,web
+
+      # The generators both add new files under apps/, packages/, and
+      # libs/, and rewrite existing barrel files in place (e.g.
+      # packages/db/src/schema/index.ts) — checkout alone reverts the
+      # rewrites, clean removes the new files, and both must run across
+      # all three roots the seven generators actually write to.
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          git checkout -- apps packages libs
+          git clean -fd apps packages libs
+
+      - if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore(workspace): nx migrate to latest"
+          title: "chore(workspace): nx migrate to latest"
+          body: |
+            Automated `nx migrate latest` against `workspace/`, gated on:
+
+            - `nx run-many --target=lint,typecheck,test,build --all`
+            - `nx run-many --target=e2e --all`
+            - a full domain-module generator smoke test (schema through screen) followed by `typecheck,build`
+
+            Review the diff — especially anything under `workspace/tools/generators` — before merging. Merging does not publish; bump `package.json` separately to release.
+          branch: nx-migrate/scheduled
+          delete-branch: true
+          add-paths: workspace
