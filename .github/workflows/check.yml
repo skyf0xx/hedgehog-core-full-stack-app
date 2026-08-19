@@ -39,3 +39,65 @@ jobs:
       - run: node repro/first-commit-rejected.mjs
 
       - run: node repro/commit-gate-fails-open.mjs
+
+  # A Dependabot bump only ever touches workspace/package.json +
+  # pnpm-lock.yaml in isolation, and the `check` job above never installs
+  # workspace/ at all — so without this job, an Nx-coupled dependency
+  # clash (two packages that individually pass but conflict once
+  # resolved together) would only surface on nx-migrate.yml's next
+  # Monday run, or in production. This job runs the same bar
+  # nx-migrate.yml already holds a migration to — lint, typecheck, test,
+  # build, e2e, and a full domain-module generator smoke test — against
+  # every PR that touches the workspace dependency graph, so a bad
+  # combination fails before merge instead of after.
+  workspace-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            deps:
+              - 'workspace/package.json'
+              - 'workspace/pnpm-lock.yaml'
+
+      - if: steps.filter.outputs.deps == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: corepack enable
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && pnpm install --frozen-lockfile
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && npx nx run-many --target=lint,typecheck,test,build --all
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && npx playwright install --with-deps
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && npx nx run-many --target=e2e --all
+
+      # Same smoke test nx-migrate.yml runs: a dependency bump that
+      # breaks a generator's own output (not just the existing apps)
+      # would otherwise only be caught on the next scheduled nx-migrate
+      # run.
+      - if: steps.filter.outputs.deps == 'true'
+        run: |
+          cd workspace
+          FIELDS="title:string(500),done:boolean"
+          npx nx g @hedgehog/generators:schema ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:contract ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:repository ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:service ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g @hedgehog/generators:hook ci-smoke-test --no-interactive
+          npx nx g @hedgehog/generators:screen ci-smoke-test --no-interactive
+          npx nx run-many --target=typecheck,build --projects=api,web

@@ -1,0 +1,51 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "risk:dependencies"
+
+  # workspace/ is the Nx/pnpm monorepo itself — grouping every minor/patch
+  # bump into one PR (rather than one PR per package) is what makes the
+  # extended check.yml gate below worth having: an Nx-coupled workspace
+  # can pass a single isolated bump and still break when two land
+  # together, so batching means the full lint/typecheck/test/build/e2e
+  # gate runs once against the combined result instead of N times against
+  # N partial ones. Nx's own coupled-upgrade migrations (nx + @nx/*) stay
+  # out of this and are handled by nx-migrate.yml instead, since `nx
+  # migrate` — not Dependabot — is what keeps that plugin set mutually
+  # compatible.
+  - package-ecosystem: "npm"
+    directory: "/workspace"
+    schedule:
+      interval: "weekly"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "nx"
+          - "@nx/*"
+    labels:
+      - "risk:dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "risk:dependencies"
+      - "risk:ci"
