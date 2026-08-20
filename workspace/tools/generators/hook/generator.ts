@@ -122,7 +122,7 @@ export function use${pascal}() {
   });
 }
 
-export function use${entityPascal}(id: string) {
+export function use${entityPascal}ById(id: string) {
   return useQuery({
     queryKey: ${camel}Keys.detail(id),
     queryFn: async () => {
