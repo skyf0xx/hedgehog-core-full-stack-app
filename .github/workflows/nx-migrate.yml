@@ -70,17 +70,32 @@ jobs:
           npx nx g @hedgehog/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
           npx nx g @hedgehog/generators:hook ci-smoke-test --no-interactive
           npx nx g @hedgehog/generators:screen ci-smoke-test --no-interactive
-          npx nx run-many --target=typecheck,build --projects=api,web
+
+      # The controller/hook generators add new workspace:* deps (the
+      # contract/repository/service/hook libs they wire up) to
+      # apps/api/package.json and apps/web/package.json. Those only
+      # exist as node_modules symlinks after another install — without
+      # this, typecheck/build below fails with "Cannot find module"
+      # for every generated package, even though the generators
+      # themselves ran cleanly.
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && pnpm install --no-frozen-lockfile
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx nx run-many --target=typecheck,build --projects=api,web
 
       # The generators both add new files under apps/, packages/, and
       # libs/, and rewrite existing barrel files in place (e.g.
       # packages/db/src/schema/index.ts) — checkout alone reverts the
       # rewrites, clean removes the new files, and both must run across
-      # all three roots the seven generators actually write to.
+      # all three roots the seven generators actually write to. The
+      # smoke-test install above also adds the generated packages to
+      # pnpm-lock.yaml, so that needs reverting too or it'd drift out
+      # of sync with the package.json files checkout just restored.
       - if: steps.diff.outputs.changed == 'true'
         run: |
           cd workspace
-          git checkout -- apps packages libs
+          git checkout -- apps packages libs pnpm-lock.yaml
           git clean -fd apps packages libs
 
       - if: steps.diff.outputs.changed == 'true'
