@@ -120,4 +120,16 @@ jobs:
           npx nx g @hedgehog/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
           npx nx g @hedgehog/generators:hook ci-smoke-test --no-interactive
           npx nx g @hedgehog/generators:screen ci-smoke-test --no-interactive
-          npx nx run-many --target=typecheck,build --projects=api,web
+
+      # The controller/hook generators add new workspace:* deps (the
+      # contract/repository/service/hook libs they wire up) to
+      # apps/api/package.json and apps/web/package.json. Those only
+      # exist as node_modules symlinks after another install — without
+      # this, typecheck/build below fails with "Cannot find module"
+      # for every generated package, even though the generators
+      # themselves ran cleanly.
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && pnpm install --no-frozen-lockfile
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && npx nx run-many --target=typecheck,build --projects=api,web
