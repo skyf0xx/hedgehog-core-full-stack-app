@@ -68,11 +68,14 @@ function writeApiBaseUrl(tree: Tree) {
 }
 
 function clientFile(names: ModuleNames): string {
-  return `import { initClient } from '@ts-rest/core';
+  return `import { initClient, type InitClientReturn } from '@ts-rest/core';
 import { ${names.camel}Contract } from 'contracts';
 import { apiBaseUrl } from '../api-base-url';
 
-export function ${names.camel}Client() {
+export function ${names.camel}Client(): InitClientReturn<
+  typeof ${names.camel}Contract,
+  { baseUrl: string }
+> {
   return initClient(${names.camel}Contract, { baseUrl: apiBaseUrl() });
 }
 
