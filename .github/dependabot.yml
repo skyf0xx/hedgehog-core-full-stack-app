@@ -11,6 +11,8 @@ updates:
           - "patch"
     labels:
       - "risk:dependencies"
+    commit-message:
+      prefix: "chore"
 
   # workspace/ is the Nx/pnpm monorepo itself — grouping every minor/patch
   # bump into one PR (rather than one PR per package) is what makes the
@@ -36,6 +38,8 @@ updates:
           - "@nx/*"
     labels:
       - "risk:dependencies"
+    commit-message:
+      prefix: "chore"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -49,3 +53,5 @@ updates:
     labels:
       - "risk:dependencies"
       - "risk:ci"
+    commit-message:
+      prefix: "chore"
