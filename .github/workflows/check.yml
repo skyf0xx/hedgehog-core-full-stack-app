@@ -52,6 +52,26 @@ jobs:
   # combination fails before merge instead of after.
   workspace-build:
     runs-on: ubuntu-latest
+    # Matches workspace/docker-compose.yml and .env.example, so api-e2e and
+    # the api dev server it drives (npm run dev via `nx e2e`) can reach a
+    # real database instead of failing closed with ECONNREFUSED.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app
+      WEB_ORIGIN: http://localhost:3000
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v7
         with:
