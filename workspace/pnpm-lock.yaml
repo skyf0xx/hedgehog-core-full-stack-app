@@ -73,6 +73,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.1(jiti@2.7.0))
+      '@hedgehog/generators':
+        specifier: workspace:*
+        version: link:tools/generators
       '@nestjs/schematics':
         specifier: ^11.0.0
         version: 11.1.0(prettier@3.9.6)(typescript@6.0.3)
@@ -337,6 +340,8 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.0
+
+  tools/generators: {}
 
 packages:
 
