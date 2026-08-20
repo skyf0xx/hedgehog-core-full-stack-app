@@ -81,8 +81,19 @@ jobs:
       - if: steps.diff.outputs.changed == 'true'
         run: cd workspace && pnpm install --no-frozen-lockfile
 
+      # api/web's own typecheck only resolves the generated libs'
+      # .d.ts files from disk — it doesn't build them. Typechecking
+      # --all first walks the project graph in dependency order (the
+      # new contracts/hooks/repository/service libs before api/web),
+      # so their declaration output exists by the time api/web needs
+      # it. Skipping this makes api/web:typecheck fail with TS6305
+      # ("output file has not been built from source file") even
+      # though every project passes typecheck individually.
       - if: steps.diff.outputs.changed == 'true'
-        run: cd workspace && npx nx run-many --target=typecheck,build --projects=api,web
+        run: cd workspace && npx nx run-many --target=typecheck --all
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx nx run-many --target=build --projects=api,web
 
       # The generators both add new files under apps/, packages/, and
       # libs/, and rewrite existing barrel files in place (e.g.
