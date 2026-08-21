@@ -35,7 +35,7 @@
 // Exits 0 when the first commit succeeds with the gate running.
 
 import { mkdtemp, rm, writeFile, mkdir, readFile, chmod, symlink, cp } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +133,9 @@ try {
   }
   if (!existsSync(join(repo, '.git/hooks/pre-commit'))) {
     console.error('  ERROR: lefthook did not install a pre-commit hook; nothing to test.');
+    console.error(`  install stdout: ${install.stdout ?? ''}`);
+    console.error(`  install stderr: ${install.stderr ?? ''}`);
+    console.error(`  .git/hooks contents: ${existsSync(join(repo, '.git/hooks')) ? readdirSync(join(repo, '.git/hooks')).join(', ') : '(missing)'}`);
     process.exit(1);
   }
 
