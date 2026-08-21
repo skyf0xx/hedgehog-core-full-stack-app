@@ -98,10 +98,21 @@ try {
     console.error('  ERROR: full-stack-app package.json no longer pins lefthook.');
     process.exit(1);
   }
+  // npm 11+'s allowScripts gate blocks a package's postinstall unless
+  // explicitly allowed, and blocks it silently — lefthook's own
+  // postinstall then swallows the resulting missing-binary exception,
+  // so 'npm install' reports success with no hook installed. The real
+  // workspace/ installs via pnpm and its own onlyBuiltDependencies
+  // mechanism, so this only affects this repro's own throwaway install.
   await writeFile(
     join(repo, 'package.json'),
     JSON.stringify(
-      { name: 'repro', private: true, devDependencies: { lefthook: lefthookSpec } },
+      {
+        name: 'repro',
+        private: true,
+        devDependencies: { lefthook: lefthookSpec },
+        allowScripts: { lefthook: true },
+      },
       null,
       2,
     ),
@@ -110,9 +121,14 @@ try {
   // LEFTHOOK=1 because lefthook's postinstall skips installing hooks
   // when CI is set — without it this would "pass" on CI by never
   // installing a gate in the first place.
-  const install = run('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline'], {
+  const installEnv = { ...gitEnv, LEFTHOOK: '1' };
+  delete installEnv.NPM_CONFIG_USERCONFIG;
+  delete installEnv.NODE_AUTH_TOKEN;
+  delete installEnv.npm_config_userconfig;
+
+  const install = run('npm', ['install', '--no-audit', '--no-fund'], {
     cwd: repo,
-    env: { ...gitEnv, LEFTHOOK: '1' },
+    env: installEnv,
   });
   if (install.status !== 0) {
     console.error(
