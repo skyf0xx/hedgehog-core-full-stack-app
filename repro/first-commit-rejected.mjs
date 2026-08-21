@@ -99,10 +99,21 @@ try {
     console.error('  ERROR: full-stack-app package.json no longer pins lefthook.');
     process.exit(1);
   }
+  // npm 11+'s allowScripts gate blocks a package's postinstall unless
+  // explicitly allowed, and blocks it silently — lefthook's own
+  // postinstall then swallows the resulting missing-binary exception,
+  // so the real workspace/ (which installs via pnpm, unaffected by this
+  // npm-only gate) never surfaces the gap. This throwaway repo uses
+  // plain npm, so it must allow lefthook's postinstall itself.
   await writeFile(
     join(repo, 'package.json'),
     JSON.stringify(
-      { name: 'repro', private: true, devDependencies: { lefthook: lefthookSpec } },
+      {
+        name: 'repro',
+        private: true,
+        devDependencies: { lefthook: lefthookSpec },
+        allowScripts: { lefthook: true },
+      },
       null,
       2,
     ),
