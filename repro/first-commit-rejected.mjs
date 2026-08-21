@@ -108,9 +108,21 @@ try {
     ),
   );
 
-  const install = run('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline'], {
+  // The publish job's own npm env (NPM_CONFIG_USERCONFIG pointing at a
+  // registry.npmjs.org-scoped auth token, plus any NODE_AUTH_TOKEN) has
+  // no business governing this throwaway repo's install — inheriting it
+  // made the platform-specific lefthook optional dependency fail to
+  // fetch in CI with no visible error, since npm silently drops a failed
+  // optional dependency and lefthook's own postinstall swallows the
+  // resulting missing-binary exception.
+  const installEnv = { ...gitEnv, LEFTHOOK: '1' };
+  delete installEnv.NPM_CONFIG_USERCONFIG;
+  delete installEnv.NODE_AUTH_TOKEN;
+  delete installEnv.npm_config_userconfig;
+
+  const install = run('npm', ['install', '--no-audit', '--no-fund'], {
     cwd: repo,
-    env: { ...gitEnv, LEFTHOOK: '1' },
+    env: installEnv,
   });
   if (install.status !== 0) {
     console.error(
