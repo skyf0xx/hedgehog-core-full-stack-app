@@ -453,7 +453,10 @@ When a downstream step reveals an upstream step was wrong:
    claimed but not yet started (`hedgehog release <task-id> --owner
    <owner>`).
 2. Once nothing is in flight (`hedgehog quiesce` exits 0), patch the
-   upstream step directly, in place.
+   upstream step directly, in place. Before editing, run the LSP tool's
+   findReferences/incomingCalls against the symbol being changed to see
+   what already depends on it — the blast radius a stale mental model
+   would otherwise miss.
 3. Fast-forward every dependent step that breaks, each its own small
    commit. If the patched step lives in a workspace package (e.g.
    `packages/hooks`, `packages/contracts`) that a running `web`/`mobile`
