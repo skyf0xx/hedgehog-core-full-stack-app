@@ -156,7 +156,10 @@ writes `docs/design/<module>.md`, not its own compiled layer — the
    SCOPE — in ONE message with parallel tool calls, not one agent call
    after another. This is a Claude session orchestrating via the Agent
    tool's parallel-call mechanism: N claimed tasks means N Agent calls in
-   the same message.
+   the same message. If a dispatch by name reports the agent as not
+   found — expected right after `init`/`update` installed it this same
+   session — see root CLAUDE.md's "Delegating on this host" note rather
+   than treating it as fatal.
 3. Each agent **runs typecheck/lint/test on its own work** (mirrors
    lefthook, wired at bootstrap) as a sanity check before reporting
    back — necessary, not sufficient. Per task, per agent: the agent
