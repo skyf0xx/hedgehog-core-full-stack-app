@@ -17,6 +17,7 @@
 # every test once after every module's layers land, in exchange for those
 # layers running in parallel.
 id: full-stack-app
+pattern: vertical-slice
 layers:
   - id: schema
     scope: ["packages/db/src/schema/{module}/**", "packages/db/src/schema/index.ts"]

@@ -75,6 +75,8 @@ controller  (thin HTTP)
 hook        (TanStack Query)       — Phase B only
 ```
 
+This is what `workspace/core.yaml` declares as `pattern: vertical-slice` — every layer's scope carries `{module}`, so the chain above runs once per module, independently, joined only at the exclusive `join` layer.
+
 Plus, when an operation needs async **and the Queue add-on is on for this
 project** (check `.hedgehog/addons.yaml`'s `queue.on`): **queue = port +
 BullMQ adapter**, same port/adapter shape as the repository. The service
