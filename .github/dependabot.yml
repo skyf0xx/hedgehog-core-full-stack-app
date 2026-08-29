@@ -23,7 +23,11 @@ updates:
   # N partial ones. Nx's own coupled-upgrade migrations (nx + @nx/*) stay
   # out of this and are handled by nx-migrate.yml instead, since `nx
   # migrate` — not Dependabot — is what keeps that plugin set mutually
-  # compatible.
+  # compatible. `exclude-patterns` only keeps nx/@nx/* out of the
+  # minor-and-patch group — Dependabot still opens an individual PR per
+  # excluded package regardless, so `ignore` (which filters a dependency
+  # out before PR creation, not just out of a group) is what actually
+  # stops them.
   - package-ecosystem: "npm"
     directory: "/workspace"
     schedule:
@@ -36,6 +40,9 @@ updates:
         exclude-patterns:
           - "nx"
           - "@nx/*"
+    ignore:
+      - dependency-name: "nx"
+      - dependency-name: "@nx/*"
     labels:
       - "risk:dependencies"
     commit-message:
