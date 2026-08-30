@@ -143,8 +143,9 @@ conclusion.
 8. Hand off to `front-end-eng` for the screen step. The file isn't a step in
    the Domain Module Pattern and isn't committed on its own — it lands in
    the same commit as the screen step it informs
-   (`feat(<module>): screen-web`), same as any other file
-   `front-end-eng` touches while building that step.
+   (`feat(<module>): screen-web`, or `feat(<module>): screen` when the
+   Mobile add-on is on), same as any other file `front-end-eng` touches
+   while building that step.
 
 ## Constraints
 
