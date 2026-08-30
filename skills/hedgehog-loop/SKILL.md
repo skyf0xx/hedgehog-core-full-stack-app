@@ -204,10 +204,7 @@ outcome of the whole intent, not just this layer's objective. A layer's
 verify command runs the tests that layer wrote, so it measures internal
 consistency, never coverage of what was asked; build the layer's share of
 the goal and say so when the packet doesn't account for something the
-goal asks for. How deep those tests need to go is not uniform across
-layers — see `hedgehog-authored-loop`'s "Test depth follows verify
-radius" for the rule (`verify_radius`/`exclusive: true` mark where the
-real bar and the `reviewer` pass belong). Every per-module layer here has
+goal asks for. Every per-module layer here has
 its verify radius equal to its own scope by construction (`core.yaml`'s
 own header comment says so) — internally-consistent-only. The real
 integration point is `join`, the workspace-wide `exclusive: true` layer
