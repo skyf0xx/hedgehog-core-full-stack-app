@@ -9,6 +9,11 @@
       "description": "Domain module name, plural kebab-case (e.g. tasks, order-items).",
       "$default": { "$source": "argv", "index": 0 },
       "x-prompt": "Domain module name (plural kebab-case)?"
+    },
+    "platforms": {
+      "type": "string",
+      "description": "Comma-separated target platforms: web, or web,mobile. hedgehog-bootstrap's Mobile step sets the default to web,mobile when apps/mobile is scaffolded — the one place that knows the mobile app exists.",
+      "default": "web"
     }
   },
   "required": ["module"]
