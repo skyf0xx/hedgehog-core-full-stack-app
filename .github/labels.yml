@@ -85,3 +85,7 @@
 - name: "stale"
   color: "ededed"
   description: "No activity for a while; will auto-close if that continues"
+
+- name: "automation-failure"
+  color: "d73a4a"
+  description: "A scheduled workflow run failed and needs attention"
