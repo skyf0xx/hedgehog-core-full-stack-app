@@ -131,15 +131,23 @@ jobs:
       # new files. libs/ only ever holds generator output (no tracked
       # content ever lived there), so it's checkout's to clean but not
       # to check out — a checkout naming an untracked-only path fails
-      # with "pathspec 'libs' did not match any file(s)". The
-      # smoke-test install above also adds the generated packages to
-      # pnpm-lock.yaml, so that needs reverting too or it'd drift out
-      # of sync with the package.json files checkout just restored.
+      # with "pathspec 'libs' did not match any file(s)".
       - if: steps.diff.outputs.changed == 'true'
         run: |
           cd workspace
-          git checkout -- apps packages pnpm-lock.yaml nx.json tsconfig.json
+          git checkout -- apps packages nx.json tsconfig.json
           git clean -fd apps packages libs .gitignore
+
+      # pnpm-lock.yaml is deliberately excluded from the checkout above:
+      # it still carries both the `nx migrate` version bump (the PR's
+      # actual payload) and the smoke test's now-reverted generated
+      # packages. Re-running install against the just-restored
+      # package.json files regenerates the lockfile so it drops the
+      # generated-package entries while keeping the migrate bump —
+      # a plain `git checkout` of the lockfile would silently discard
+      # the bump along with the smoke-test noise.
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && pnpm install --no-frozen-lockfile
 
       - if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
