@@ -258,8 +258,11 @@ both that the Nx `mobile` project exists and that its test target is real:
     depends_on: hook
     scope: ["apps/web/src/app/{module}/**", "apps/mobile/src/{module}/**"]
     verify: "pnpm nx test web -- src/app/{module}/ && pnpm nx test mobile -- src/{module}/"
-    commit: "feat({module}): screen-web"
+    commit: "feat({module}): screen"
 ```
+
+The commit message drops the `-web` suffix here because the layer now
+covers both platforms, not just web.
 
 Then run `hedgehog plan --recompile`. `planner` already compiled every
 module's tasks before handing over, so the edit reaches the not-yet-started
