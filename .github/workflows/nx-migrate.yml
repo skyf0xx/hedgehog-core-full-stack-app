@@ -123,18 +123,23 @@ jobs:
         run: cd workspace && npx nx run-many --target=build --projects=api,web
 
       # The generators both add new files under apps/, packages/, and
-      # libs/, and rewrite existing barrel files in place (e.g.
-      # packages/db/src/schema/index.ts) — checkout alone reverts the
-      # rewrites, clean removes the new files, and both must run across
-      # all three roots the seven generators actually write to. The
+      # libs/, and rewrite existing tracked files in place — barrel
+      # files under apps/ and packages/ (e.g.
+      # packages/db/src/schema/index.ts), plus root nx.json and
+      # tsconfig.json and a root .gitignore the framework writes as a
+      # side effect — checkout reverts the rewrites, clean removes the
+      # new files. libs/ only ever holds generator output (no tracked
+      # content ever lived there), so it's checkout's to clean but not
+      # to check out — a checkout naming an untracked-only path fails
+      # with "pathspec 'libs' did not match any file(s)". The
       # smoke-test install above also adds the generated packages to
       # pnpm-lock.yaml, so that needs reverting too or it'd drift out
       # of sync with the package.json files checkout just restored.
       - if: steps.diff.outputs.changed == 'true'
         run: |
           cd workspace
-          git checkout -- apps packages libs pnpm-lock.yaml
-          git clean -fd apps packages libs
+          git checkout -- apps packages pnpm-lock.yaml nx.json tsconfig.json
+          git clean -fd apps packages libs .gitignore
 
       - if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
