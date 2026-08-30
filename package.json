@@ -1,6 +1,6 @@
 {
   "name": "@skyf0xx/hedgehog-core-full-stack-app",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Hedgehog's full-stack-app core: an Nx/pnpm/NestJS/Next.js workspace, backend-first domain module build discipline, and the agents and skills that drive it.",
   "type": "module",
   "scripts": {
