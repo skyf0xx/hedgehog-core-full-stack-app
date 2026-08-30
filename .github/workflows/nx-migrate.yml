@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   migrate:
@@ -130,3 +131,46 @@ jobs:
           branch: nx-migrate/scheduled
           delete-branch: true
           add-paths: workspace
+
+      # Runs on any prior step failure so a red scheduled run surfaces
+      # somewhere a human sees it, instead of only in the Actions tab.
+      # Reuses one open issue across consecutive failures (rather than
+      # opening a new one each week) so repeated runs don't spam the
+      # tracker.
+      - if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = "nx-migrate workflow is failing";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const label = "automation-failure";
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: label,
+            });
+            const open = existing.find((issue) => issue.title === title);
+            const body = `The scheduled \`nx-migrate\` workflow failed: ${runUrl}`;
+
+            if (open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open.number,
+                body,
+              });
+            } else {
+              // GitHub creates a label on the fly from `labels` if the
+              // repo doesn't have it yet, so this works even before
+              // label-sync (which only runs on push to main) picks up
+              // the definition added to .github/labels.yml.
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
