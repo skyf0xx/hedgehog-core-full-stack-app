@@ -49,7 +49,7 @@
     "eslint-plugin-jsx-a11y": "6.10.1",
     "eslint-plugin-playwright": "^1.6.2",
     "eslint-plugin-react": "^7.35.0",
-    "eslint-plugin-react-hooks": "5.0.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "jsdom": "^30.0.1",
     "lefthook": "^2.1.10",
     "nx": "23.1.2",
@@ -83,7 +83,15 @@
     "onlyBuiltDependencies": [
       "lefthook"
     ],
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "eslint-plugin-import>eslint": "10",
+        "eslint-plugin-jsx-a11y>eslint": "10",
+        "eslint-plugin-react>eslint": "10"
+      }
+    },
     "overrides": {
+      "@nx/module-federation": "23.1.2",
       "esbuild": "0.25.12",
       "axios": "^1.18.0",
       "brace-expansion@1": "^1.1.18",
