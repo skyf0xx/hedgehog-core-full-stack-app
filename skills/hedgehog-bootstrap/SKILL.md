@@ -236,17 +236,49 @@ say so plainly and move on — same pattern as Auth (step 1) and Queue
 (step 2) when their add-on is off.
 
 ```bash
-npx nx g @nx/expo:app apps/mobile
-pnpm add react-native-reusables nativewind
+npx nx g @nx/expo:app apps/mobile --unitTestRunner=jest
+npx @react-native-reusables/cli@latest init
+npx @react-native-reusables/cli@latest add button text
 ```
 
-Configure NativeWind's theme (`tailwind.config.js` colors, light/dark) to
-match `apps/web`'s base theme (landed by `hedgehog-bootstrap-full-stack-app-core`) — one
-visual identity across platforms, set once here rather than drifting
-per-screen. Tag: `scope:mobile`.
+`@nx/expo:app`'s own default for `--unitTestRunner` is `none` — pass it
+explicitly, or `apps/mobile` has no `test` target at all and the `screen`
+layer's verify command below fails on a missing target rather than a
+real test.
+
+React Native Reusables ships as a CLI, same copy-you-own-the-code model
+as `apps/web`'s ShadCN setup, not a plain npm dependency: `init` wires
+NativeWind and the `@/*` path alias into `apps/mobile/tsconfig.json`
+(matching `apps/web`'s own `components.json` alias); `add` copies the
+named components' source into `apps/mobile/src/components/ui/`. `button`
+and `text` are the two the `screen` generator's mobile output imports —
+add any further components `front-end-eng` needs the same way, per
+module, as it builds.
+
+Edit `init`'s generated theme (`tailwind.config.js` colors, light/dark)
+to match `apps/web`'s base theme (landed by
+`hedgehog-bootstrap-full-stack-app-core`) rather than its own default
+palette — one visual identity across platforms, set once here rather
+than drifting per-screen. Tag: `scope:mobile`.
 
 `packages/config/eslint-base.js` already ships the `scope:mobile`
 `depConstraints` entry — nothing to add there.
+
+**Set the `screen` generator's platform default to both.** The generator
+ships defaulting to `web` alone — this is the one Bootstrap step that
+knows `apps/mobile` exists, so it's where the default widens. Add a
+`generators` entry to root `nx.json`:
+
+```json
+"generators": {
+  "hedgehog:screen": {
+    "platforms": "web,mobile"
+  }
+}
+```
+
+so every module's `screen` layer task runs the generator against both
+platforms without each dispatch having to pass `--platforms` by hand.
 
 **Extend the `screen` layer in root `core.yaml` to cover mobile.** The
 shipped layer is web-only, because `apps/mobile` exists only on a project
@@ -256,10 +288,22 @@ both that the Nx `mobile` project exists and that its test target is real:
 ```yaml
   - id: screen
     depends_on: hook
-    scope: ["apps/web/src/app/{module}/**", "apps/mobile/src/{module}/**"]
+    scope:
+      [
+        "apps/web/src/app/{module}/**",
+        "apps/mobile/src/{module}/**",
+        "apps/mobile/src/app/{module}.tsx",
+      ]
     verify: "pnpm nx test web -- src/app/{module}/ && pnpm nx test mobile -- src/{module}/"
     commit: "feat({module}): screen"
 ```
+
+The third scope entry is the mobile route file itself: Expo Router only
+resolves routes under `src/app/`, so `screen`'s mobile output has a thin
+route re-export there (mirroring `apps/web`'s own `page.tsx`) alongside
+the screen/form/spec under `src/{module}/`. Both paths need to be in
+scope, or `hedgehog verify` flags the route file as an unscoped write on
+every module.
 
 The commit message drops the `-web` suffix here because the layer now
 covers both platforms, not just web.
