@@ -85,6 +85,16 @@ mockup, not a design system, not code:
    archive with no UX spec and nothing supplied — say that plainly here,
    so `front-end-eng` and `reviewer` read the rationale as reasoned from
    the contract and hook rather than from a direction on file.
+6. **Platform divergence**, only when the Mobile add-on is on: a section
+   stating, per module, whether `apps/web` and `apps/mobile` match or
+   diverge on — the navigation model on each platform; how the
+   create/edit form is presented (inline, modal, or its own route/screen)
+   on each platform; and list density and what a row shows on each
+   platform. State each shared decision once, in the sections above, and
+   use this section only to call out where a platform genuinely diverges
+   from it, and why — not to restate the web description in mobile
+   terms. Say what you decided, not what the answer should generically
+   be. Omit this section entirely when Mobile is off — no empty heading.
 
 Keep it short — a few bullets per screen, not a document. This is a
 rationale `front-end-eng` reads once before starting, and `reviewer` can
@@ -123,24 +133,30 @@ conclusion.
 
 1. Confirm the module's hook step is committed (`feat(<module>): hooks`)
    — if not, stop, this is being asked for too early.
-2. Check for `docs/design/<module>-notes.md` and read it if present. If
+2. Read `.hedgehog/addons.yaml` to determine whether the Mobile add-on is
+   on (`mobile.on`) for this project — the same file `bootstrap` and
+   `reviewer` already read as the source of truth for add-on state. This
+   decides whether "What you produce," above, needs a platform section.
+3. Check for `docs/design/<module>-notes.md` and read it if present. If
    it's thin or missing a detail you need, read whichever of
    `.hedgehog/BMAD/05-ux-spec/DESIGN.md` and `EXPERIENCE.md` the archive
    holds, for the full material it was drawn from. Where neither the
-   notes nor the spec covers what you need, that gap goes into step 3's
+   notes nor the spec covers what you need, that gap goes into step 4's
    ask — it is not something to fill in yourself.
-3. Announce the Phase B transition and ask for visual input, per "When
+4. Announce the Phase B transition and ask for visual input, per "When
    you run," above.
-4. Read the contract (`packages/contracts`) for the module: what
+5. Read the contract (`packages/contracts`) for the module: what
    operations exist, what each returns, what's required vs. optional.
-5. Read the hook (`packages/hooks`) to confirm what's actually exposed
+6. Read the hook (`packages/hooks`) to confirm what's actually exposed
    to the screen layer (loading/error states, mutation shape).
-6. Check for existing screens in `apps/web` / `apps/mobile`, and existing
+7. Check for existing screens in `apps/web` / `apps/mobile`, and existing
    files under `docs/design/`, for other modules — reuse established
    patterns (Jakob's Law applies to this codebase's own prior screens
-   first, external conventions second).
-7. Write `docs/design/<module>.md` per "What you produce," above.
-8. Hand off to `front-end-eng` for the screen step. The file isn't a step in
+   first, external conventions second). When Mobile is on, this is also
+   where you look for prior platform-divergence calls to stay consistent
+   with.
+8. Write `docs/design/<module>.md` per "What you produce," above.
+9. Hand off to `front-end-eng` for the screen step. The file isn't a step in
    the Domain Module Pattern and isn't committed on its own — it lands in
    the same commit as the screen step it informs
    (`feat(<module>): screen-web`), same as any other file
