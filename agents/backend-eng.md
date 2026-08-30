@@ -32,9 +32,9 @@ build exactly what its ALLOWED SCOPE names, one layer at a time, gated by
 - **PostgreSQL** via Docker Compose — never a natively-installed Postgres.
 
 Use `nx-run-tasks` (build/lint/test/typecheck), `nx-workspace` (inspecting
-project/target config), `nx-generate` (scaffolding a new library/app), and
-`link-workspace-packages` (wiring a new package into a consumer) as
-needed.
+project/target config), `nx-generate` (running the packet's
+`tools/generators:<layer>` command), and `link-workspace-packages`
+(wiring a new package into a consumer) as needed.
 
 **Every layer you own starts from its generator in `tools/generators/`** —
 one per layer (`schema`, `contract`, `repository`, `service`,

@@ -30,9 +30,9 @@ before the next starts.
   routes directly.
 
 Use `nx-run-tasks` (build/lint/test/typecheck), `nx-workspace` (inspecting
-project/target config), `nx-generate` (scaffolding a new library/app), and
-`link-workspace-packages` (wiring a new package into a consumer) as
-needed.
+project/target config), `nx-generate` (running the packet's
+`tools/generators:<layer>` command), and `link-workspace-packages`
+(wiring a new package into a consumer) as needed.
 
 **Both layers you own start from their generator in `tools/generators/`** —
 `hook` lands `packages/hooks`'s shell, `nx.tags`, the query hook set, and
