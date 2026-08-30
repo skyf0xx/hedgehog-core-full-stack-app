@@ -1,165 +1,73 @@
 ---
 name: nx-generate
-description: Generate code using nx generators. INVOKE IMMEDIATELY when user mentions scaffolding, setup, structure, creating apps/libs, or setting up project structure. Trigger words - scaffold, setup, create a new app, create a new lib, project structure, generate, add a new project. ALWAYS use this BEFORE calling nx_docs or exploring - this skill handles discovery internally.
-subagent: general-purpose
-context: fork
+description: Run one of this core's own Nx generators to scaffold a domain-module layer. INVOKE when a claimed packet's LAYER SHAPE section names a `tools/generators:<layer>` command to run.
 ---
 
 # Run Nx Generator
 
-Nx generators are powerful tools that scaffold projects, make automated code migrations or automate repetitive tasks in a monorepo. They ensure consistency across the codebase and reduce boilerplate work.
-
-This skill applies when the user wants to:
-
-- Create new projects like libraries or applications
-- Scaffold features or boilerplate code
-- Run workspace-specific or custom generators
-- Do anything else that an nx generator exists for
-
-## Key Principles
-
-1. **Always use `--no-interactive`** - Prevents prompts that would hang execution
-2. **Read the generator source code** - The schema alone is not enough; understand what the generator actually does
-3. **Match existing repo patterns** - Study similar artifacts in the repo and follow their conventions
-4. **Verify with lint/test/build/typecheck etc.** - Generated code must pass verification, using whatever targets are appropriate for this workspace (CI config is a good guide for which ones are critical).
+Adapted from Nx's stock `nx-generate` skill for this core's closed set of
+generators: `tools/generators/` holds exactly one generator per domain
+module layer (`schema`, `contract`, `repository`, `service`, `controller`,
+`hook`, `screen`), and every layer's task packet already names which one
+to run and with what flags — there is no generator discovery or matching
+step here. `hedgehog-loop`'s "Scaffolding a layer" section owns the full
+flag contract; this skill covers only the mechanics of invoking one.
 
 ## Steps
 
-### 1. Discover Available Generators
+### 1. Run the packet's command
 
-Use the Nx CLI to discover available generators:
-
-- List all generators for a plugin: `pnpm nx list @nx/react`
-- View available plugins: `pnpm nx list`
-
-This includes plugin generators (e.g., `@nx/react:library`) and local workspace generators.
-
-### 2. Match Generator to User Request
-
-Identify which generator(s) could fulfill the user's needs. Consider what artifact type they want, which framework is relevant, and any specific generator names mentioned.
-
-**IMPORTANT**: When both a local workspace generator and an external plugin generator could satisfy the request, **always prefer the local workspace generator**. Local generators are customized for the specific repo's patterns.
-
-If no suitable generator exists, you can stop using this skill. However, the burden of proof is high—carefully consider all available generators before deciding none apply.
-
-### 3. Get Generator Options
-
-Use the `--help` flag to understand available options:
+The claimed packet's LAYER SHAPE section prints the exact command,
+already filled in with `--module` and `--fields`. Run it as given:
 
 ```bash
-pnpm nx g @nx/react:library --help
+nx g ./tools/generators:<layer> --module=<module> [--fields='<name:type,...>'] [--toggleField=<boolField>]
 ```
 
-Pay attention to required options, defaults that might need overriding, and options relevant to the user's request.
+Always pass `--no-interactive` if the command is going to run
+unattended and might otherwise prompt.
 
-### Library Buildability
-
-**Default to non-buildable libraries** unless there's a specific reason for buildable.
-
-| Type                        | When to use                                                       | Generator flags                     |
-| --------------------------- | ----------------------------------------------------------------- | ----------------------------------- |
-| **Non-buildable** (default) | Internal monorepo libs consumed by apps                           | No `--bundler` flag                 |
-| **Buildable**               | Publishing to npm, cross-repo sharing, stable libs for cache hits | `--bundler=vite` or `--bundler=swc` |
-
-Non-buildable libs:
-
-- Export `.ts`/`.tsx` source directly
-- Consumer's bundler compiles them
-- Faster dev experience, less config
-
-Buildable libs:
-
-- Have their own build target
-- Useful for stable libs that rarely change (cache hits)
-- Required for npm publishing
-
-**If unclear, ask the user:** "Should this library be buildable (own build step, better caching) or non-buildable (source consumed directly, simpler setup)?"
-
-### 4. Read Generator Source Code
-
-**This step is critical.** The schema alone does not tell you everything. Reading the source code helps you:
-
-- Know exactly what files will be created/modified and where
-- Understand side effects (updating configs, installing deps, etc.)
-- Identify behaviors and options not obvious from the schema
-- Understand how options interact with each other
-
-To find generator source code:
-
-- For plugin generators: Use `node -e "console.log(require.resolve('@nx/<plugin>/generators.json'));"` to find the generators.json, then locate the source from there
-- If that fails, read directly from `node_modules/<plugin>/generators.json`
-- For local generators: Typically in `tools/generators/` or a local plugin directory. Search the repo for the generator name.
-
-After reading the source, reconsider: Is this the right generator? If not, go back to step 2.
-
-> **⚠️ `--directory` flag behavior can be misleading.**
-> It should specify the full path of the generated library or component, not the parent path that it will be generated in.
->
-> ```bash
-> # ✅ Correct - directory is the full path for the library
-> nx g @nx/react:library --directory=libs/my-lib
-> # generates libs/my-lib/package.json and more
->
-> # ❌ Wrong - this will create files at libs and libs/src/...
-> nx g @nx/react:library --name=my-lib --directory=libs
-> # generates libs/package.json and more
-> ```
-
-### 5. Examine Existing Patterns
-
-Before generating, examine the target area of the codebase:
-
-- Look at similar existing artifacts (other libraries, applications, etc.)
-- Identify naming conventions, file structures, and configuration patterns
-- Note which test runners, build tools, and linters are used
-- Configure the generator to match these patterns
-
-### 6. Dry-Run to Verify File Placement
-
-**Always run with `--dry-run` first** to verify files will be created in the correct location:
+### 2. Dry-run first when the placement is unfamiliar
 
 ```bash
-pnpm nx g @nx/react:library --name=my-lib --dry-run --no-interactive
+nx g ./tools/generators:<layer> --module=<module> --dry-run --no-interactive
 ```
 
-Review the output carefully. If files would be created in the wrong location, adjust your options based on what you learned from the generator source code.
+Most of the time the generator's target paths are already well
+understood (they're fixed by layer, per `hedgehog-loop`), so this step is
+optional — reach for it when something about the module name or flags is
+unusual enough to want to see the file list before it lands.
 
-Note: Some generators don't support dry-run (e.g., if they install npm packages). If dry-run fails for this reason, proceed to running the generator for real.
+### 3. Read the generator source if a flag's effect is unclear
 
-### 7. Run the Generator
+The generator's own source lives in `tools/generators/<layer>/generator.ts`
+next to its `schema.json`. Read it before guessing at what a flag does —
+the schema alone doesn't show side effects (barrel wiring, tag
+assignment, module registration).
 
-Execute the generator:
+### 4. Author the entity-specific delta
 
-```bash
-pnpm nx generate <generator-name> <options> --no-interactive
-```
+The generator lands the layer's skeleton — package shell, `nx.tags`,
+port-discipline file suffixes, barrel wiring, and (for `screen`)
+placeholder sections. It does not write the module's field-specific
+logic, business rules, or UX. Author that on top, per the packet's
+INTENT and RELEVANT RULES.
 
-> **Tip:** New packages often need workspace dependencies wired up (e.g., importing shared types, being consumed by apps). The `link-workspace-packages` skill can help add these correctly.
+**Important:** if a generated test file needs replacing rather than
+extending, write a meaningful replacement — an empty test suite fails
+`nx test`.
 
-### 8. Modify Generated Code (If Needed)
+### 5. Wire the new package into the workspace
 
-Generators provide a starting point. Modify the output as needed to:
+A layer that's the first arrival in its package needs
+`pnpm install && pnpm nx sync` before verify can see it — see
+`hedgehog-loop`'s "First arrival in a package" for which layers this
+applies to and the override that widens scope for it. The
+`link-workspace-packages` skill covers adding a dependency between two
+existing packages.
 
-- Add or modify functionality as requested
-- Adjust imports, exports, or configurations
-- Integrate with existing code patterns
+### 6. Verify
 
-**Important:** If you replace or delete generated test files (e.g., `*.spec.ts`), either write meaningful replacement tests or remove the `test` target from the project configuration. Empty test suites will cause `nx test` to fail.
-
-### 9. Format and Verify
-
-Format all generated/modified files:
-
-```bash
-pnpm nx format --fix
-```
-
-This example is for built-in nx formatting with prettier. There might be other formatting tools for this workspace, use these when appropriate.
-
-Then verify the generated code works. Keep in mind that the changes you make with a generator or subsequent modifications might impact various projects so it's usually not enough to only run targets for the artifact you just created.
-
-```bash
-pnpm nx run-many -t build,lint,test,typecheck
-```
-
-If verification fails with manageable issues (a few lint errors, minor type issues), fix them. If issues are extensive, attempt obvious fixes first, then escalate to the user with details about what was generated, what's failing, and what you've attempted.
+Run whatever the packet's VERIFICATION command specifies. `nx-run-tasks`
+covers running build/lint/test/typecheck directly if you need to check
+something the packet's own command doesn't cover.
