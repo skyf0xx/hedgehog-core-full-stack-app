@@ -163,8 +163,13 @@ write — same treatment as an out-of-scope `apps/mobile`.
 
 ```bash
 npx nx g @nx/js:lib packages/auth --bundler=none --unitTestRunner=vitest
-pnpm add better-auth @thallesp/nestjs-better-auth
 ```
+
+`better-auth` and `@thallesp/nestjs-better-auth` are already declared in
+root `package.json` and resolved by `pnpm-lock.yaml` — the core ships
+them, so there is nothing to install here. Don't run `pnpm add` for
+either: an add resolves against npm at whatever is latest today, which
+is the drift this core pins them to avoid.
 
 Configure the Drizzle adapter against `packages/db`. Add
 `BETTER_AUTH_SECRET: z.string().min(32)` to `packages/config/env.schema.ts`
@@ -175,9 +180,10 @@ line reproduces the exact `loadEnv()` crash-on-boot that
 `hedgehog-bootstrap-full-stack-app-core`'s `DATABASE_URL` entry exists to prevent, just
 for this var instead. Tag: `scope:auth`, `type:adapter`.
 
-Also wire the global auth guard on `apps/api`: `pnpm add
-@thallesp/nestjs-better-auth` there too and register the guard
-(secure-by-default) against `packages/auth`. `apps/api`'s
+Also wire the global auth guard on `apps/api`: register the guard
+(secure-by-default) against `packages/auth` — the root declaration
+already resolves `@thallesp/nestjs-better-auth` for every project in the
+workspace, so `apps/api` needs no add of its own. `apps/api`'s
 `depConstraints` entry needs `scope:auth` added to its allowed
 dependencies now — the one deliberate exception to "api reaches things
 only through ports," since auth is cross-cutting infra, not a domain
@@ -195,8 +201,11 @@ skipped, say so plainly and move on — same treatment as an out-of-scope
 
 ```bash
 npx nx g @nx/node:app apps/worker
-pnpm add bullmq ioredis
 ```
+
+`bullmq` and `ioredis` are already declared in root `package.json` and
+resolved by `pnpm-lock.yaml` — same as Auth's packages above. Nothing to
+install here; don't run `pnpm add` for either.
 
 Add a `redis` service to the root `docker-compose.yml` that
 `hedgehog-bootstrap-full-stack-app-core` landed (Postgres-only) and
@@ -235,11 +244,48 @@ Skip this step entirely if Mobile isn't on for this project (check
 say so plainly and move on — same pattern as Auth (step 1) and Queue
 (step 2) when their add-on is off.
 
+Mobile's packages are pinned in `addon-versions.json` at the workspace
+root, not named inline here and not declared in root `package.json` —
+Expo pulls a native build matrix that has no business in a project that
+never scaffolds `apps/mobile`. Read every version from that file rather
+than typing one, so this step installs what the core was last gated
+against:
+
 ```bash
+NX_EXPO=$(node -p "require('./addon-versions.json').mobile['@nx/expo']")
+NATIVEWIND=$(node -p "require('./addon-versions.json').mobile.nativewind")
+RNR=$(node -p "require('./addon-versions.json').mobile['@react-native-reusables/cli']")
+
+pnpm add -w -D "@nx/expo@$NX_EXPO"
+pnpm add -w "nativewind@$NATIVEWIND"
+
 npx nx g @nx/expo:app apps/mobile --unitTestRunner=jest
-npx @react-native-reusables/cli@latest init
-npx @react-native-reusables/cli@latest add button text
+
+npx "@react-native-reusables/cli@$RNR" init
+npx "@react-native-reusables/cli@$RNR" add button text
 ```
+
+`-w` is required: this is a pnpm workspace, and an add without it fails
+with `ERR_PNPM_ADDING_TO_ROOT` rather than installing.
+
+`@nx/expo:app` generates `apps/mobile/src/test-setup.ts` with an untyped
+`defineGlobal` helper, which is a `TS7006` error under the core's
+`strict: true` base tsconfig — `mobile:typecheck` fails on a fresh
+scaffold until it is annotated:
+
+```ts
+const defineGlobal = (name: string, value: unknown) => {
+```
+
+Make that edit before the step's commit. `nx-migrate.yml`'s add-on gate
+applies the same annotation, so the day `@nx/expo` ships the types both
+stop being needed together.
+
+`@nx/expo`'s pin is byte-identical to every other `@nx/*` entry in root
+`package.json` — Nx requires its plugin matrix to be version-identical,
+and a mismatch fails at generator time with a resolution error rather
+than at install. If the pin and the `@nx/*` entries have drifted apart,
+stop and fix `addon-versions.json` rather than installing anyway.
 
 `@nx/expo:app`'s own default for `--unitTestRunner` is `none` — pass it
 explicitly, or `apps/mobile` has no `test` target at all and the `screen`
@@ -253,7 +299,7 @@ NativeWind and the `@/*` path alias into `apps/mobile/tsconfig.json`
 named components' source into `apps/mobile/src/components/ui/`. `button`
 and `text` are the two the `screen` generator's mobile output imports —
 add any further components `front-end-eng` needs the same way, per
-module, as it builds.
+module, as it builds, at the same pinned CLI version.
 
 Edit `init`'s generated theme (`tailwind.config.js` colors, light/dark)
 to match `apps/web`'s base theme (landed by
@@ -355,6 +401,19 @@ time via `hedgehog next`/`hedgehog verify`, each its own commit.
   (written by `planner` at planning intake) turns that add-on on — say so
   plainly and skip otherwise, don't leave it ambiguous whether the step
   was considered.
+- A skipped Auth or Queue step leaves that add-on's packages declared but
+  unused, since the core ships them in root `package.json`. Delete the
+  skipped add-on's entries (`better-auth` and
+  `@thallesp/nestjs-better-auth` for Auth; `bullmq` and `ioredis` for
+  Queue) and re-run `pnpm install` so the lockfile drops them. Do this in
+  the same commit that records the skip. Mobile needs nothing — its
+  packages were never in the install to begin with.
+- Never write a version number into a command in this file. Auth and
+  Queue versions come from root `package.json`; Mobile's come from
+  `addon-versions.json`. A version typed into a step is invisible to
+  `nx migrate`, to `pnpm outdated`, and to CI's add-on gate, so it drifts
+  silently in whichever direction the day's npm resolution happens to
+  take it.
 - Don't add domain schema, contracts, or any `libs/<module>/*` content —
   that's Phase A, started after Bootstrap, one module at a time.
 - Don't deviate from the package/library choices above, for whichever

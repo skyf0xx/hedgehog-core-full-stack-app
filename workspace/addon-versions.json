@@ -1,0 +1,39 @@
+{
+  "$comment": [
+    "Pinned versions for the Mobile add-on's packages, which are NOT declared in",
+    "workspace/package.json. Expo pulls a native build matrix (Metro, the",
+    "React Native toolchain, the @react-native-reusables CLI's own tree) that",
+    "every consuming project would otherwise install whether or not it ever",
+    "scaffolds apps/mobile. Declaring them here keeps the version a tracked,",
+    "tool-visible fact — nx-migrate.yml's add-on gate scaffolds against these",
+    "pins every Monday, and a bump is a reviewable diff — without putting the",
+    "matrix in the default install.",
+    "",
+    "Auth and Queue packages are NOT here: they are plain Node dependencies with",
+    "no native matrix, so they are declared in workspace/package.json and",
+    "resolved by pnpm-lock.yaml like every other core dependency.",
+    "",
+    "@nx/expo must stay byte-identical to every other @nx/* entry in",
+    "workspace/package.json — Nx requires its plugin matrix to be version-",
+    "identical, and a mismatch fails at generator time, not install time.",
+    "nx-migrate.yml's add-on gate asserts that equality before it scaffolds.",
+    "",
+    "nativewind stays on 4.x: 5.x, the line that targets Tailwind v4, is still",
+    "a preview release. 4.x declares a `tailwindcss@~3` peer (through",
+    "react-native-css-interop) against the v4 that apps/web pins, which the",
+    "`react-native-css-interop>tailwindcss` peerDependencyRules entry in",
+    "package.json accepts — apps/mobile carries its own NativeWind-side Tailwind",
+    "config, written by the @react-native-reusables CLI's init, so the two",
+    "never share a config. Revisit both when nativewind 5 goes stable.",
+    "",
+    "@react-native-reusables/cli is a scaffolder, not a runtime dependency — it",
+    "copies component source into apps/mobile and is never installed. Pinning it",
+    "is what stops `npx @react-native-reusables/cli@latest` from resolving to a",
+    "different generator on every Bootstrap run."
+  ],
+  "mobile": {
+    "@nx/expo": "23.1.2",
+    "nativewind": "4.2.6",
+    "@react-native-reusables/cli": "0.7.1"
+  }
+}

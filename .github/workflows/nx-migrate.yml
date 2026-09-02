@@ -122,6 +122,109 @@ jobs:
       - if: steps.diff.outputs.changed == 'true'
         run: cd workspace && npx nx run-many --target=build --projects=api,web
 
+      # The add-on gate. The domain-module smoke test above proves the
+      # migration left the generators producing working code; this
+      # proves it also left the three add-ons (Auth, Queue, Mobile)
+      # scaffoldable, which the generator test never touches — an
+      # add-on step runs on a consuming project's machine at Bootstrap
+      # time, so a break here surfaces in a user's Bootstrap run rather
+      # than anywhere this repo would see it.
+      #
+      # Auth and Queue are declared dependencies, so the install above
+      # already resolved them: what needs proving is that their
+      # Bootstrap steps' generators still run against the migrated tree
+      # and the result typechecks. Mobile's packages are not in the
+      # install (see workspace/addon-versions.json for why) — this step
+      # installs them at their pinned versions, which is also the only
+      # place a bad Mobile pin can be caught.
+      #
+      # @nx/expo must match the rest of the @nx/* matrix or the
+      # generator fails at resolution rather than at install, so the
+      # equality is asserted before anything is installed. `nx migrate`
+      # bumps the @nx/* entries in package.json but has no way to know
+      # about addon-versions.json, so this assertion is what turns a
+      # migration into a red run instead of a silently stale pin.
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          NX_VERSION=$(node -p "require('./package.json').devDependencies.nx")
+          EXPO_VERSION=$(node -p "require('./addon-versions.json').mobile['@nx/expo']")
+          if [ "$NX_VERSION" != "$EXPO_VERSION" ]; then
+            echo "::error::@nx/expo is pinned at $EXPO_VERSION in addon-versions.json but the @nx/* matrix is at $NX_VERSION. Nx requires them identical — update addon-versions.json."
+            exit 1
+          fi
+
+      # Auth: packages/auth is a plain @nx/js lib, and the Bootstrap
+      # step's own packages are already installed. Scaffolding it and
+      # importing better-auth from it is what proves the declared
+      # versions actually resolve together against the migrated tree,
+      # rather than only installing cleanly.
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          npx nx g @nx/js:lib packages/auth --bundler=none --unitTestRunner=vitest --no-interactive
+          cat > packages/auth/src/index.ts <<'EOF'
+          import { betterAuth } from 'better-auth';
+          import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+          import { AuthModule } from '@thallesp/nestjs-better-auth';
+
+          export const auth = betterAuth({
+            database: drizzleAdapter({}, { provider: 'pg' }),
+            secret: process.env.BETTER_AUTH_SECRET ?? 'ci-smoke-test-secret',
+          });
+
+          export const authModule = AuthModule;
+          EOF
+
+      # Queue: apps/worker is a plain @nx/node app. Same shape as Auth —
+      # scaffold, then import the declared packages so a resolution
+      # break in bullmq/ioredis fails typecheck instead of surfacing at
+      # a consuming project's Bootstrap.
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          npx nx g @nx/node:app apps/worker --no-interactive
+          cat > apps/worker/src/main.ts <<'EOF'
+          import { Queue } from 'bullmq';
+          import IORedis from 'ioredis';
+
+          const connection = new IORedis(
+            process.env.REDIS_URL ?? 'redis://localhost:6379',
+            { maxRetriesPerRequest: null },
+          );
+
+          export const smokeQueue = new Queue('ci-smoke-test', { connection });
+          EOF
+
+      # Mobile: installs the pinned add-on packages, then runs the same
+      # generator the Bootstrap step runs. --unitTestRunner=jest matches
+      # the Bootstrap step (the generator's own default is `none`, which
+      # would leave apps/mobile with no test target).
+      - if: steps.diff.outputs.changed == 'true'
+        run: |
+          cd workspace
+          NX_EXPO=$(node -p "require('./addon-versions.json').mobile['@nx/expo']")
+          NATIVEWIND=$(node -p "require('./addon-versions.json').mobile.nativewind")
+          pnpm add -w -D "@nx/expo@$NX_EXPO"
+          pnpm add -w "nativewind@$NATIVEWIND"
+          npx nx g @nx/expo:app apps/mobile --unitTestRunner=jest --no-interactive
+          # @nx/expo's generated test-setup.ts declares defineGlobal with
+          # untyped parameters, which is a TS7006 error under the core's
+          # `strict: true` base tsconfig. The Bootstrap step's Mobile
+          # section carries the same fix — this mirrors it so the gate
+          # tests the workspace a consuming project actually ends up
+          # with. Drop both when @nx/expo ships the annotations.
+          sed -i 's/const defineGlobal = (name, value) => {/const defineGlobal = (name: string, value: unknown) => {/' apps/mobile/src/test-setup.ts
+
+      # Same reason the domain-module smoke test reinstalls before
+      # typechecking: the generators add workspace:* deps that only
+      # exist as node_modules symlinks after another install.
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && pnpm install --no-frozen-lockfile
+
+      - if: steps.diff.outputs.changed == 'true'
+        run: cd workspace && npx nx run-many --target=typecheck --all
+
       # The generators both add new files under apps/, packages/, and
       # libs/, and rewrite existing tracked files in place — barrel
       # files under apps/ and packages/ (e.g.
@@ -132,11 +235,24 @@ jobs:
       # content ever lived there), so it's checkout's to clean but not
       # to check out — a checkout naming an untracked-only path fails
       # with "pathspec 'libs' did not match any file(s)".
+      #
+      # The add-on gate widens both halves of this. package.json and
+      # .vscode/extensions.json join the checkout: the Mobile gate adds
+      # @nx/expo and nativewind to the first (they are pinned in
+      # addon-versions.json precisely so they stay out of the shipped
+      # install, so the gate's own additions must not survive into the
+      # PR — which is why the @nx/* equality is asserted rather than
+      # written), and @nx/expo:app rewrites the second. babel.config.json,
+      # jest.config.ts, jest.preset.cjs, .vscode/launch.json and
+      # tools/ join the clean: the Expo generator writes all of them at
+      # the workspace root as a side effect of adding its first
+      # React Native project, and each is untracked here.
       - if: steps.diff.outputs.changed == 'true'
         run: |
           cd workspace
-          git checkout -- apps packages nx.json tsconfig.json
-          git clean -fd apps packages libs .gitignore
+          git checkout -- apps packages nx.json tsconfig.json package.json .vscode/extensions.json
+          git clean -fd apps packages libs tools .vscode .gitignore \
+            babel.config.json jest.config.ts jest.preset.cjs
 
       # pnpm-lock.yaml is deliberately excluded from the checkout above:
       # it still carries both the `nx migrate` version bump (the PR's
@@ -160,6 +276,7 @@ jobs:
             - `nx run-many --target=lint,typecheck,test,build --all`
             - `nx run-many --target=e2e --all`
             - a full domain-module generator smoke test (schema through screen) followed by `typecheck,build`
+            - an add-on gate: `@nx/expo`'s pin in `workspace/addon-versions.json` asserted equal to the `@nx/*` matrix, then all three add-ons (Auth, Queue, Mobile) scaffolded against the migrated tree and typechecked
 
             Review the diff — especially anything under `workspace/tools/generators` — before merging. Merging does not publish; bump `package.json` separately to release.
           branch: nx-migrate/scheduled

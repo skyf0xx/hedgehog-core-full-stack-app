@@ -84,6 +84,7 @@ jobs:
             deps:
               - 'workspace/package.json'
               - 'workspace/pnpm-lock.yaml'
+              - 'workspace/addon-versions.json'
 
       - if: steps.filter.outputs.deps == 'true'
         uses: actions/setup-node@v7
@@ -144,3 +145,74 @@ jobs:
 
       - if: steps.filter.outputs.deps == 'true'
         run: cd workspace && npx nx run-many --target=build --projects=api,web
+
+      # Same add-on gate nx-migrate.yml runs, for the same reason the
+      # domain-module smoke test is duplicated here: a Dependabot bump
+      # to better-auth/bullmq/ioredis, or an edit to addon-versions.json,
+      # would otherwise only be gated on the next scheduled nx-migrate
+      # run. The @nx/expo pin is asserted equal to the @nx/* matrix
+      # before anything installs, since Nx requires them identical and
+      # a mismatch fails at generator time rather than at install.
+      - if: steps.filter.outputs.deps == 'true'
+        run: |
+          cd workspace
+          NX_VERSION=$(node -p "require('./package.json').devDependencies.nx")
+          EXPO_VERSION=$(node -p "require('./addon-versions.json').mobile['@nx/expo']")
+          if [ "$NX_VERSION" != "$EXPO_VERSION" ]; then
+            echo "::error::@nx/expo is pinned at $EXPO_VERSION in addon-versions.json but the @nx/* matrix is at $NX_VERSION. Nx requires them identical — update addon-versions.json."
+            exit 1
+          fi
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: |
+          cd workspace
+          npx nx g @nx/js:lib packages/auth --bundler=none --unitTestRunner=vitest --no-interactive
+          cat > packages/auth/src/index.ts <<'EOF'
+          import { betterAuth } from 'better-auth';
+          import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+          import { AuthModule } from '@thallesp/nestjs-better-auth';
+
+          export const auth = betterAuth({
+            database: drizzleAdapter({}, { provider: 'pg' }),
+            secret: process.env.BETTER_AUTH_SECRET ?? 'ci-smoke-test-secret',
+          });
+
+          export const authModule = AuthModule;
+          EOF
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: |
+          cd workspace
+          npx nx g @nx/node:app apps/worker --no-interactive
+          cat > apps/worker/src/main.ts <<'EOF'
+          import { Queue } from 'bullmq';
+          import IORedis from 'ioredis';
+
+          const connection = new IORedis(
+            process.env.REDIS_URL ?? 'redis://localhost:6379',
+            { maxRetriesPerRequest: null },
+          );
+
+          export const smokeQueue = new Queue('ci-smoke-test', { connection });
+          EOF
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: |
+          cd workspace
+          NX_EXPO=$(node -p "require('./addon-versions.json').mobile['@nx/expo']")
+          NATIVEWIND=$(node -p "require('./addon-versions.json').mobile.nativewind")
+          pnpm add -w -D "@nx/expo@$NX_EXPO"
+          pnpm add -w "nativewind@$NATIVEWIND"
+          npx nx g @nx/expo:app apps/mobile --unitTestRunner=jest --no-interactive
+          # @nx/expo's generated test-setup.ts declares defineGlobal with
+          # untyped parameters, a TS7006 error under the core's
+          # `strict: true` base tsconfig. The Bootstrap skill's Mobile
+          # step carries the same fix; drop both when @nx/expo ships the
+          # annotations.
+          sed -i 's/const defineGlobal = (name, value) => {/const defineGlobal = (name: string, value: unknown) => {/' apps/mobile/src/test-setup.ts
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && pnpm install --no-frozen-lockfile
+
+      - if: steps.filter.outputs.deps == 'true'
+        run: cd workspace && npx nx run-many --target=typecheck --all
