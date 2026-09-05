@@ -17,7 +17,7 @@ Ground rules, learned the hard way from PR #13.
    npx nx run-many --target=e2e --all   # needs `docker compose up -d` first
    ```
 4. If that's green, push one branch, one PR. Done.
-5. **If it's not green within ~30 minutes of active debugging, stop.** Revert, close the PR, leave the Dependabot PRs (or a fresh set) for next week. Do not chase CI infrastructure bugs, generator bugs, or unpatched security advisories that surface incidentally — file them separately if they're real, but they are not this task.
+5. **If it's not green within ~10 minutes of active debugging, stop.** Revert, close the PR, leave the Dependabot PRs (or a fresh set) for next week. Do not chase CI infrastructure bugs, generator bugs, or unpatched security advisories that surface incidentally — file them separately if they're real, but they are not this task.
 
 ## Hard limits
 
