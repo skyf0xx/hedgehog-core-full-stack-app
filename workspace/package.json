@@ -66,7 +66,7 @@
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-express": "^11.2.3",
     "@thallesp/nestjs-better-auth": "^2.7.0",
     "axios": "^1.18.0",
     "better-auth": "^1.7.2",
