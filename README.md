@@ -50,11 +50,6 @@ Ask your agent:
 npx @skyf0xx/hedgehog init
 ```
 
-Hedgehog's planner selects this core automatically when your project
-needs backend logic like background jobs, webhooks, authorization
-beyond row-level rules, or server-rendered pages. You can also request
-it directly:
-
 ```
 npx @skyf0xx/hedgehog init --ts-full-stack-app
 ```
