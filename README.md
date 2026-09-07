@@ -2,9 +2,9 @@
 
 ### A Backend You Don't Have to Watch
 
-Every AI coding tool can scaffold an app. Few can stop the backend from
-rotting as it grows — auth logic scattered across routes, contracts
-drifting from the client, schema changes nobody tested.
+Every AI coding tool can scaffold an app. Most let the backend rot as it
+grows: auth logic scattered across routes, contracts drifting from the
+client, schema changes nobody tested.
 
 This core gives Hedgehog a backend that stays honest as it grows: one
 opinionated stack, one enforced build order, and a phase gate that
@@ -23,20 +23,20 @@ flowchart LR
 ## What you get
 
 - **NestJS + Drizzle + PostgreSQL** on the backend, **Next.js + ShadCN +
-  Tailwind** on the frontend — decided once, not re-litigated per
-  feature.
-- **ts-rest contracts** so the client can't drift from the API: the
-  types are shared, not duplicated.
-- **TanStack Query hooks**, generated, not handwritten.
+  Tailwind** on the frontend, locked in once so every feature reuses the
+  same stack.
+- **ts-rest contracts** so the client can't drift from the API: one
+  shared type definition feeds both sides.
+- **TanStack Query hooks**, generated straight from the contracts.
 - **A commit gate** (lefthook + commitlint) that blocks a broken build
   from ever reaching your history.
 
-## Built for real backend work
+## Built for production backend work
 
 Reach for this core when the project needs authorization beyond
 per-object rules, background jobs, scheduled work, webhooks, or
-server-rendered pages — the things that make "just add a database" turn
-into a maintenance job.
+server-rendered pages. These are the features that turn "add a database"
+into an ongoing maintenance job.
 
 ## Easy to install and use
 
@@ -51,7 +51,7 @@ npx @skyf0xx/hedgehog init
 ```
 
 Hedgehog's planner selects this core automatically when your project
-needs real backend logic — background jobs, webhooks, authorization
+needs backend logic like background jobs, webhooks, authorization
 beyond row-level rules, or server-rendered pages. You can also request
 it directly:
 
