@@ -1,6 +1,6 @@
 # Hedgehog Full-Stack App Core ⭐
 
-### A Backend You Don't Have to Watch
+### For: Well Architechted Full Stack Apps
 
 Every AI coding tool can scaffold an app. Most let the backend rot as it
 grows: auth logic scattered across routes, contracts drifting from the
