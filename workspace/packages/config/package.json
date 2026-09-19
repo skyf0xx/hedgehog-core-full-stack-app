@@ -16,7 +16,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "zod": "^4.0.0",
+    "zod": "^4.6.5",
     "@ts-rest/core": "3.53.0-rc.1"
   },
   "nx": {
