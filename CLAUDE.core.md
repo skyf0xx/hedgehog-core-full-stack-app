@@ -22,46 +22,25 @@ steps from memory:
   `hedgehog verify`, which commits it on a pass. Also holds the Correction
   Protocol for fixing a wrong upstream step. Invoke it at the start of any
   build session and for "what's next".
+<!-- hedgehog:bootstrap-only start -->
 - **`hedgehog-bootstrap`** — run **once**, at project start, to scaffold
   the core stack, the enforcement config, and whichever add-ons (Auth,
   Queue, Mobile) planning intake turned on. Skip if `nx.json` already
   exists.
+<!-- hedgehog:bootstrap-only end -->
 - **`conventional-commits`** — when a change spans several steps in one
   working-tree pass and needs splitting back into per-step commits (mainly
   Correction Protocol cleanups).
 
 ### The agents — delegate the judgment calls
 
-- **`planner`** — planning intake (which core applies, then
-  `hedgehog-planning-intake`'s BMAD-METHOD brainstorming/brief/PRD/UX-spec
-  shelf, mined into intent records, the Add-ons decision, and domain
-  vocabulary) at project start. Writes intents via `hedgehog intent add`,
-  `.hedgehog/addons.yaml`, and `.hedgehog/BMAD/`. On first run, hands off
-  to the `bootstrap` agent once Confirm & Lock holds. Runs again whenever
-  new scope enters play — including after the build is complete — taking
-  `hedgehog-planning-intake`'s **Re-entry pass**: the BMAD shelf and
-  `bootstrap` are both skipped, new modules are mined into additional
-  intents, and `hedgehog plan` appends their tasks without touching
-  anything already built.
-- **`bootstrap`** — runs `hedgehog-bootstrap`'s core steps (always) plus
-  whichever add-on steps planning intake turned on. Triggered
-  automatically by `planner` after its first run; skip if `nx.json`
-  already exists.
-- **`backend-eng`** — builds each module's Phase A layers (schema →
-  contract → repository → service → controller → queue?), one
-  `hedgehog claim`ed packet at a time, gated by `hedgehog verify`.
-- **`ux-planner`** — once per module in Phase B, after the hook exists and
-  before the screen: writes `docs/design/<module>.md`, reading
-  `.hedgehog/BMAD/05-ux-spec/` directly (or
-  `docs/design/<module>-notes.md` if a prior run already filed one). Where
-  the archive holds no UX spec, it asks for visual input rather than
-  inferring a direction.
-- **`front-end-eng`** — builds each module's Phase B layers (hook, screen)
-  from the ux-planner rationale, one `hedgehog claim`ed packet at a time,
-  gated by `hedgehog verify`.
-- **`reviewer`** — phase-transition and Correction Protocol checks the
-  mechanical gate can't make (port discipline, FK-by-ID discipline,
-  contract shape).
+`backend-eng` builds each module's Phase A layers (schema → contract →
+repository → service → controller → queue?), one `hedgehog claim`ed
+packet at a time, gated by `hedgehog verify`. `front-end-eng` builds
+each module's Phase B layers (hook, screen) from `ux-planner`'s
+rationale, the same way. See `hedgehog-loop` for exactly which agent
+owns which layer and the claim/verify sequencing — that skill is the
+source, not restated here.
 
 ## The constants (do not deviate)
 
@@ -120,9 +99,6 @@ libs/
 docs/
   design     <module>.md (ux-planner, reading .hedgehog/BMAD/05-ux-spec/ directly)
 ```
-
-Check `.hedgehog/addons.yaml` before assuming any "only if" line above is
-actually present in this codebase.
 
 ### Core rules
 

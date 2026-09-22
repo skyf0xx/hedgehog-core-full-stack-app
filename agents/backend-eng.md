@@ -51,12 +51,12 @@ catch.
 ## Core Responsibilities
 
 - **`schema`**: define the table in `packages/db` (Drizzle). One domain
-  module = one table. Cross-module references are FK-by-ID columns
-  only — never a foreign schema import. Add one re-export line for the
-  module to `packages/db/src/schema/index.ts` (in scope for this
-  layer) so the table is importable outside `packages/db` — the
-  package's own `src/index.ts` re-exports that barrel and never
-  changes after bootstrap.
+  module per table, cross-module references FK-by-ID only (root
+  CLAUDE.md's Core rules) — never a foreign schema import. Add one
+  re-export line for the module to `packages/db/src/schema/index.ts`
+  (in scope for this layer) so the table is importable outside
+  `packages/db` — the package's own `src/index.ts` re-exports that
+  barrel and never changes after bootstrap.
 - **`contract`**: derive the Zod schema from Drizzle (`drizzle-zod`) and
   wire the ts-rest contract in `packages/contracts`. A `date`-mode
   `timestamp` column reflected through `createSelectSchema` is overridden
@@ -101,8 +101,7 @@ catch.
    the packet's scope and rules don't account for; your own tests prove
    internal consistency, never coverage of what was asked. INHERITED DEBT
    is what the layers you depend on declared they left for you; declare
-   your own with `hedgehog debt add <task-id> "<note>"` rather than a
-   code comment nothing reads. Its WHY NOW section
+   your own with `hedgehog debt add <task-id> "<note>"`. Its WHY NOW section
    already confirms the module is in scope and every dependency is
    `complete` — no need to re-derive that by hand. Cross-module FK
    targets should already have their own schema landed (the packet's
@@ -122,14 +121,10 @@ catch.
    name the shared files that changed (typically `pnpm-lock.yaml`, root
    `tsconfig.json`) in your report — the orchestrating session commits
    them separately, since you report but never commit (next step).
-3. **Report the work as done; do not commit it yourself.** Per the build
-   graph's design, an agent reporting success never moves a task — only
-   `hedgehog verify <task-id>`'s passing exit code does. It checks your
-   changes against the packet's ALLOWED SCOPE, re-runs the real
-   verification command, and on a pass writes the commit (the packet's
-   exact Conventional Commit message) itself. Any shared workspace files
-   you flagged in step 2 are a separate commit the orchestrating session
-   makes before dispatching `hedgehog verify`, not something you commit.
+3. **Report the work as done; do not commit it yourself.** Any shared
+   workspace files you flagged in step 2 are a separate commit the
+   orchestrating session makes before dispatching `hedgehog verify`, not
+   something you commit.
 4. One layer at a time — never start the next layer before
    `hedgehog verify` reports the current one `complete`.
 5. Once `hedgehog verify` reports the `controller` layer (and any bundled
@@ -154,7 +149,7 @@ catch.
   reported rather than chosen here. `verify` cannot check any of this,
   which is exactly why it's on you.
 - Never import another module's repository, service, or schema directly
-  — cross-module references are FK-by-ID, resolved at the
+  — FK-by-ID only (root CLAUDE.md's Core rules), resolved at the
   contract/controller layer (parallel calls) or via a same-repository
   Drizzle join against the other module's *schema*, never its adapter.
 - Never write queue infra when the Queue add-on is off (per
