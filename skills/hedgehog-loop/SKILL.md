@@ -9,9 +9,10 @@ The operating loop for a bootstrapped Hedgehog project: `hedgehog claim`
 reserves the packet(s) for ready layers, build them, `hedgehog verify`
 gates and commits each. The build graph (`.hedgehog/hedgehog.db`) is the
 live list — query it via `hedgehog status`/`hedgehog ready`, never
-re-derive state from prose. The step tables below mirror this core's
+re-derive state from prose. The step table in the [scaffolding
+reference](references/scaffolding.md) mirrors this core's
 `workspace/core.yaml`, the design source of truth
-for layer order, scope, and verify command per layer — read the tables
+for layer order, scope, and verify command per layer — read the table
 for the human-readable shape, and the YAML when they seem to disagree.
 
 The packet, though, is what actually runs. `hedgehog plan` copies each
@@ -96,49 +97,30 @@ What's authored on top is the entity-specific delta: the field list and
 its types, the module's business rules, and the UX intent behind its
 screen.
 
-## Domain Module — Backend Steps (Phase A, every module in scope)
+## Domain Module — Backend and Frontend Steps
 
-A horizontal pass across the whole backend — every module goes through
-these before any module gets a hook or screen. Each row is one compiled
-layer in `full-stack-app/core.yaml`; delegate each module's Phase A
-layers to the `backend-eng` agent, one claimed packet per dispatch — it
-builds the layer, `hedgehog verify` gates and commits it.
+Each module goes through `schema` → `contract` → `repository` → `service`
+→ `controller` in Phase A, then `hook` → `screen` in Phase B — the same
+sequence "The Domain Module Pattern" above states. Read the [scaffolding
+reference](references/scaffolding.md) for the full step table (layer,
+where it lives, its commit message) and the generator command each layer
+starts from. Delegate each module's Phase A layers to `backend-eng` and
+Phase B layers to `front-end-eng`, one claimed packet per dispatch — it
+builds the layer, `hedgehog verify` gates and commits it. The API is
+complete, typed, and callable (Postman/curl/contract tests) before
+frontend work starts.
 
-| # | Layer | Lives in | Commit |
-|---|---|---|---|
-| 1 | `schema` | `packages/db` (Drizzle) | `feat(<module>): schema` |
-| 2 | `contract` | `packages/contracts` (Zod via `drizzle-zod` + ts-rest) | `feat(<module>): contract` |
-| 3 | `repository` | `libs/<module>/repository` (port + Drizzle adapter) | `feat(<module>): repository` |
-| 4 | `service` | `libs/<module>/service` (domain logic — imports only ports) | `feat(<module>): service` |
-| 5 | `controller` | `apps/api` (thin HTTP, wires contract → service; bundles Queue infra, see above, if that add-on is on and this module needs it) | `feat(<module>): api` |
-
-Repeat 1–5 per module in scope, via `hedgehog claim`/`hedgehog verify`.
-The API is complete, typed, and callable (Postman/curl/contract tests)
-before frontend work starts.
-
-## Domain Module — Frontend Steps (Phase B, after Phase A closes for the module)
-
-| # | Layer | Lives in | Commit |
-|---|---|---|---|
-| 6 | `hook` | `packages/hooks` (TanStack Query) | `feat(<module>): hooks` |
-| 6a | UX rationale | `docs/design/<module>.md`, `ux-planner` agent | bundled into layer 7's commit |
-| 7 | `screen` | `apps/web`, plus `apps/mobile` when the Mobile add-on is on | `feat(<module>): screen-web`, or `feat(<module>): screen` when the Mobile add-on is on |
-
-Phase B starts once Phase A is done for the scope. The frontend is a pure
-consumer of an already-finished API. Delegate each module's Phase B
-layers to the `front-end-eng` agent, same reasoning as `backend-eng` for
-Phase A — one claimed packet per dispatch, in its own context. Step
-6a is where "how it should feel" gets decided — once per module, after
-the `hook` layer's task is `complete` and before `front-end-eng` starts
-the `screen` layer — via `ux-planner`, starting from whatever `planner`
-filed in `docs/design/<module>-notes.md` at planning intake, or the raw
-UX spec directly if that file is absent, or — where the archive holds
-neither — from the contract and hook plus whatever the user supplies when
-it asks. Its first run for a module also
-signals to the user that Phase B has started, and is the point a mockup,
-screenshot, or export (Google Stitch, Figma) can be handed over. It
-writes `docs/design/<module>.md`, not its own compiled layer — the
-`screen` layer's `hedgehog verify` is what gates and commits it.
+Between the `hook` layer's task going `complete` and `front-end-eng`
+starting the `screen` layer, `ux-planner` runs once per module to decide
+"how it should feel" — starting from whatever `planner` filed in
+`docs/design/<module>-notes.md` at planning intake, or the raw UX spec
+directly if that file is absent, or — where the archive holds neither —
+from the contract and hook plus whatever the user supplies when it asks.
+Its first run for a module also signals to the user that Phase B has
+started, and is the point a mockup, screenshot, or export (Google Stitch,
+Figma) can be handed over. It writes `docs/design/<module>.md`, not its
+own compiled layer — the `screen` layer's `hedgehog verify` is what gates
+and commits it.
 
 ## The Loop (every unit of work)
 
@@ -245,183 +227,21 @@ or `lease_expired`).
 
 ## Scaffolding a layer
 
-`tools/generators/` holds one Nx generator per layer, and every layer
-starts from its own:
-
-```bash
-nx g ./tools/generators:schema     --module=<module> --fields='<name:type,...>'
-nx g ./tools/generators:contract   --module=<module> --fields='<name:type,...>' [--toggleField=<boolField>]
-nx g ./tools/generators:repository --module=<module>
-nx g ./tools/generators:service    --module=<module> [--toggleField=<boolField>]
-nx g ./tools/generators:controller --module=<module> --fields='<name:type,...>' [--toggleField=<boolField>]
-nx g ./tools/generators:hook       --module=<module> [--toggleField=<boolField>]
-nx g ./tools/generators:screen     --module=<module>
-```
-
-`--module` is the domain module's plural kebab-case name (`tasks`,
-`order-items`). `--fields` is a comma-separated list of `name:type` pairs
-over `string`, `text`, `boolean`, `integer`, and `timestamp`, with a
-trailing `?` marking the column nullable
-(`--fields='title:string,done:boolean,dueDate:timestamp?'`); `contract`
-and `controller` take the same list the module's `schema` was generated
-with. A `string` field takes an optional length in parentheses
-(`title:string(500)`), threaded to both the Drizzle `varchar` and the Zod
-`.max()` so the two cannot disagree; omitted, it is 255. Check every
-length against the intent's own rules in the packet's **RELEVANT RULES** —
-a rule like "at most 500 characters" is the field list's business, not
-the authored delta's, and a Zod bound that outruns its column surfaces as
-a driver error at the database rather than a 400 at the boundary.
-
-`--toggleField` names a boolean field from the schema to expose as a
-toggle, and is passed to `contract`, `service`, `controller`, and `hook`
-alike — one flag, four layers, so the route, the domain method, the
-handler, and the mutation are generated from one source. The toggle is
-server-side by construction: `POST /<module>/:id/toggle` carries no body,
-and the service reads the current value and flips it inside the same
-transaction its `update` uses. The client sends only the id, so a stale
-cached row cannot overwrite a newer state — which is exactly what
-computing the new value on the client would do, losing one of any two
-flips that raced. Note that `@ts-rest/core` generates no `body` parameter
-for a `c.noBody()` route: the call is `client.toggle({ params: { id } })`,
-and passing `body: undefined` is a compile error.
-
-Each generator lands the whole conventional shape of its layer in one
-deterministic step — the package shell (`package.json`, `tsconfig*.json`,
-`vitest.config.mts`, `src/index.ts`) where the layer creates one, the
-`nx.tags` pair `packages/config/eslint-base.js`'s `depConstraints` keys
-on, the port-discipline file suffixes lint checks for, the Nest module
-and controller pair with `@Controller()` left bare (the ts-rest contract
-already encodes full route paths), and every barrel export the new files
-need. Hand-copying a sibling module's files invites exactly the drift
-`hedgehog verify`'s lint step then has to catch: missing tags, missing
-project references, a doubled route prefix.
-
-What the generator lands is the layer's skeleton, not the layer. Author
-the entity-specific delta on top: the module's business rules in
-`service`, its domain-error mapping in `controller`, and — for `screen`,
-which is skeleton-only by design — the layout, information hierarchy, and
-interaction pattern from `ux-planner`'s rationale, over the placeholders
-the generator leaves for the list, filter shell, empty state, and form.
-
-Registration inside `apps/api` is automatic and stays that way:
-`apps/api/src/app/feature-modules.ts` globs
-`apps/api/src/app/*/*.module.ts` and is regenerated by the
-`generate-feature-modules` Nx target that `build`/`typecheck`/`test`
-depend on. Never register a module by editing `app.module.ts` — a shared
-file no module-scoped task can safely touch. Validation is ts-rest + Zod,
-so this core has no Nest DTOs and no class-validator.
-
-The root page is the same: `apps/web/src/app/page.tsx` renders whatever
-`module-routes.ts` holds, and that file is regenerated by the
-`generate-module-routes` Nx target from every
-`apps/web/src/app/*/page.tsx` on disk. A screen layer creates its own
-`page.tsx` in its own directory and the root page picks it up — never
-edit either the root page or the generated file to add a link.
-
-**A new package needs wiring into the workspace before `hedgehog verify`
-runs on it.** A package that exists on disk isn't yet part of the
-workspace:
-
-```bash
-pnpm install          # link the new workspace:* deps
-pnpm nx sync          # regenerate TypeScript project references
-```
-
-`pnpm-workspace.yaml` already globs `packages/*`, `apps/*` and `libs/*/*`,
-so a package under any of those needs no edit there. This is the common
-case, not an edge case: any layer that is the first arrival in a package
-(`contract`, `hook`, each module's `repository` and `service`) or that
-wires a new package into an existing one (`controller`, adding the
-module's `contracts`/`repository`/`service` packages to `apps/api`) needs
-it — on a module's first pass through Phase A/B that is most of the
-layers, not an occasional one.
-
-The building agent runs `pnpm install` / `pnpm nx sync` and reports back
-which shared files changed (typically `pnpm-lock.yaml`, root
-`tsconfig.json`, and — on a `controller` layer — `apps/api/package.json`,
-`apps/api/tsconfig.app.json`), because it has the shell access to run
-them, but it never commits: no agent reporting success moves a task or
-touches git, only `hedgehog verify`'s passing exit code does (see the
-building agents' own Workflow step on this). Committing those shared
-files is the orchestrating session's job, done between dispatch and
-`hedgehog verify` on every layer where the agent flagged a change: expect
-it, don't wait to be reminded.
-
-```bash
-git add pnpm-lock.yaml tsconfig.json   # plus apps/*/package.json,
-                                        # apps/*/tsconfig.app.json on a
-                                        # controller layer
-git commit -m "chore(workspace): sync project references"
-```
-
-These files are mechanically derived by `pnpm install` and `pnpm nx
-sync`, not authored content, and sit outside every module-scoped layer's
-scope — they belong to no layer, and no override covers them. Committing
-them separately, before `hedgehog verify` runs, keeps the layer's own
-commit exactly the layer.
-
-This is the orchestrating session's step rather than a verify post-step
-on purpose: `hedgehog verify` gates the tree it's handed, and a gate that
-mutates that tree would manufacture the scope violation it then reports.
+Every layer starts from its own generator in `tools/generators/`, which
+lands the layer's package shell, tags, and conventional shape in one
+deterministic step, and a new package needs `pnpm install`/`pnpm nx sync`
+wired in before `hedgehog verify` can run on it. Read the [scaffolding
+reference](references/scaffolding.md) for the generator commands, flag
+contract, and workspace-wiring steps.
 
 ## First arrival in a package
 
-Every layer scope names a directory *inside* a package
-(`packages/contracts/src/{module}/**`, `libs/{module}/repository/**`), and
-on the first module through that layer the package itself doesn't exist
-yet. Its shell — `package.json`, `tsconfig*.json`, `vitest.config.mts`,
-`src/index.ts` — necessarily lands outside the layer's scope glob, because
-no `{module}`-bearing glob can cover a package root. Left alone those files
-sit on disk uncommitted until the `join` layer's `**` scope sweeps them in,
-so `git log -- packages/contracts/` shows source with no buildable package
-behind it for the whole middle of the build.
-
-A generator can also drop shared, package-wide source at the `src/` root
-alongside the module's own files on that same first pass — the `contract`
-generator's `timestamp.ts` is one (a shared Zod util every module in the
-package imports, written once, sibling to `src/index.ts`). That file needs
-the same widening as the shell itself.
-
-The packet says so: when the package a scope points into has no
-`package.json` on disk yet, `hedgehog next`/`show` prints a **FIRST
-ARRIVAL** section under ALLOWED SCOPE carrying the exact command for that
-task. Run it before building — the widening is only available while the
-task is still `ready`, and a verify that rejects the shell paths blocks
-the task and turns this into a five-command recovery.
-
-```bash
-hedgehog override add TASKS-CONTRACT \
-  --scope 'packages/contracts/*' \
-  --scope 'packages/contracts/src/*' \
-  --reason 'first module through the contract layer also creates the package shell'
-```
-
-`packages/contracts/src/*` is non-recursive, so it covers `src/index.ts`
-and `src/timestamp.ts` without also granting the module subdirectory the
-layer's own `packages/contracts/src/{module}/**` scope already covers.
-
-`.hedgehog/overrides/*.json` is additive, per-task, committed, and replayed
-by `plan`, `--recompile` and `db rebuild` alike, so the exception survives a
-rebuild and stays reviewable in the diff — unlike a hand-edited task row,
-which the next rebuild silently drops. It widens exactly the one task that
-creates the package, not the layer, so module two's task keeps the narrow
-scope.
-
-Which tasks need it: the first module through `contract`
-(`packages/contracts`) and through `hook` (`packages/hooks`), and every
-module's `repository` and `service`, since `libs/{module}/repository` and
-`libs/{module}/service` are new libs per module — there, the layer's own
-`libs/{module}/repository/**` glob already covers the package root, so no
-override is needed. `packages/db` and `packages/config` ship with core, so
-`schema` never needs one. `controller` never needs one either — `apps/api`
-ships with core, and its `apps/api/src/app/{module}/**` scope already
-covers the module's generated directory.
-
-Never widen a scope to route around a violation the Correction Protocol
-should handle — this is for a package shell the layer genuinely creates,
-nothing else. The shell itself comes from the layer's generator
-("Scaffolding a layer" above), which is also where the workspace wiring a
-new package needs lives.
+The first module through a layer whose scope names a directory inside a
+package that doesn't exist yet on disk needs its scope widened for that
+one task, since the package shell lands outside the layer's own
+`{module}`-bearing glob. Read the [first arrival
+reference](references/first-arrival.md) for which layers this applies to
+and the `hedgehog override add` command it calls for.
 
 ## Intra-step conventions
 
