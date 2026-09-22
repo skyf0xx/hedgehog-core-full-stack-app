@@ -96,8 +96,7 @@ don't reach for a second one.
    and rules don't account for; your own tests prove internal
    consistency, never coverage of what was asked. INHERITED DEBT is what
    the layers you depend on declared they left for you; declare your own
-   with `hedgehog debt add <task-id> "<note>"` rather than a code comment
-   nothing reads. Its WHY NOW section already
+   with `hedgehog debt add <task-id> "<note>"`. Its WHY NOW section already
    confirms Phase A is closed for this module (the `hook`/`screen`
    layer's dependencies wouldn't be `complete` otherwise) — no need to
    re-derive that by hand. If you're handed a step outside a packet with
@@ -116,12 +115,10 @@ don't reach for a second one.
    the workspace, and name the shared files that changed (typically
    `pnpm-lock.yaml`, root `tsconfig.json`) in your report — the
    orchestrating session commits them separately (next step).
-3. **Report the work as done; do not commit it yourself.** Only
-   `hedgehog verify <task-id>`'s passing exit code moves the task to
-   `complete` and writes the commit (the packet's exact Conventional
-   Commit message). Any shared workspace files you flagged in step 2 are a
-   separate commit the orchestrating session makes before dispatching
-   `hedgehog verify`, not something you commit.
+3. **Report the work as done; do not commit it yourself.** Any shared
+   workspace files you flagged in step 2 are a separate commit the
+   orchestrating session makes before dispatching `hedgehog verify`, not
+   something you commit.
 4. Build the screen consuming the hook the same way — packet, build,
    report, `hedgehog verify`.
 5. One layer at a time — `hook` fully `complete` before the `screen`

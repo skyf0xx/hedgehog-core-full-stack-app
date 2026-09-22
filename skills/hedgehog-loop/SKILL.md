@@ -44,14 +44,14 @@ Phase A.
 
 ## The Domain Module Pattern
 
-A **domain module = one table.** `users`, `orders`, `order_items` are each
-their own module, carrying the full step sequence below. The schema is the
-source of truth for module boundaries.
+Root CLAUDE.md's Core rules own "one table = one domain module" and
+"FK-by-ID only" — this section is their mechanics. `users`, `orders`,
+`order_items` are each their own module, carrying the full step sequence
+below. The schema is the source of truth for module boundaries.
 
-**Cross-module references are FK-by-ID only.** If `orders.user_id`
-references `users`, the `orders` schema holds a plain FK column. The
-`orders` repository and service depend only on their own ports — a service
-knows related entities only as an ID.
+If `orders.user_id` references `users`, the `orders` schema holds a plain
+FK column. The `orders` repository and service depend only on their own
+ports — a service knows related entities only as an ID.
 
 - Need the related row? Resolve it at the contract/controller layer
   (parallel calls to each module's own endpoint), or join against the
@@ -193,12 +193,8 @@ writes `docs/design/<module>.md`, not its own compiled layer — the
    `hedgehog verify <task-id> --owner <owner>` (the same owner that
    claimed it; verify requires the lease owner). Building happens in
    parallel; verifying does not — verify writes a commit, and commits go
-   through one at a time. It checks the touched files against the
-   packet's ALLOWED SCOPE, runs the layer's VERIFICATION command, and on
-   a pass writes the commit (the exact Conventional Commit message from
-   the tables above, plus the updated build graph) and unlocks the next
-   layer. On a scope violation or a failing check, the task moves to
-   `blocked` with a `blocked_reason` of `scope_violation` or
+   through one at a time. On a scope violation or a failing check, the
+   task moves to `blocked` with a `blocked_reason` of `scope_violation` or
    `verification_failed`, and nothing downstream unlocks. Fix the work,
    then run `hedgehog retry <task-id>` to return the task to `planned`,
    claim it again (by task id — see below), and verify again —
@@ -238,7 +234,7 @@ the built work against it there, because nothing else in the build does.
 A layer that hits a limitation the next layer must compensate for
 declares it with `hedgehog debt add <task-id> "<note>"`; the note lands
 in the **INHERITED DEBT** section of every packet that depends on that
-task. A comment in a source file is not a mechanism — nothing reads it.
+task.
 
 Each `hedgehog verify` call commits exactly one layer, built right for
 what's known now; a wrong layer is fixed forward later via the
@@ -615,8 +611,8 @@ the graph doesn't have a task for.
   committed.
 - The screen step doesn't start blank — `ux-planner` runs once per module,
   after the hook is committed, before `front-end-eng` starts the screen.
-- `packages/config` is the single source for shared config; a per-app
-  override request signals to fix the base config at the source.
+- `packages/config` is the single source for shared config (root
+  CLAUDE.md's Core rules).
 
 ## Stop Condition
 
