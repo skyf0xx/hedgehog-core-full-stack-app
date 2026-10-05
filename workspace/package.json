@@ -68,7 +68,7 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@thallesp/nestjs-better-auth": "^2.7.0",
-    "axios": "^1.18.0",
+    "axios": "^1.20.0",
     "better-auth": "^1.7.2",
     "bullmq": "^6.3.4",
     "drizzle-orm": "^0.45.2",
@@ -99,7 +99,7 @@
     "overrides": {
       "@nx/module-federation": "23.2.0",
       "esbuild": "0.25.12",
-      "axios": "^1.18.0",
+      "axios": "^1.20.0",
       "brace-expansion@1": "^1.1.18",
       "brace-expansion@2": "^2.1.4",
       "brace-expansion@5": "^5.0.9",
