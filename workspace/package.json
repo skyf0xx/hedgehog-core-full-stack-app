@@ -69,7 +69,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@thallesp/nestjs-better-auth": "^2.7.0",
     "axios": "^1.18.0",
-    "better-auth": "^1.7.2",
+    "better-auth": "^1.7.7",
     "bullmq": "^6.3.4",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^6.0.0",
