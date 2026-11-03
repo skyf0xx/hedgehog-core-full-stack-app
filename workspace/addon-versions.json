@@ -32,7 +32,7 @@
     "different generator on every Bootstrap run."
   ],
   "mobile": {
-    "@nx/expo": "23.1.2",
+    "@nx/expo": "23.2.0",
     "nativewind": "4.2.6",
     "@react-native-reusables/cli": "0.7.1"
   }
