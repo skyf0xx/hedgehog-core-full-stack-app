@@ -73,7 +73,7 @@
     "bullmq": "^6.6.0",
     "drizzle-orm": "^0.45.4",
     "ioredis": "^6.0.0",
-    "nestjs-pino": "^4.6.1",
+    "nestjs-pino": "^5.3.1",
     "next": "~16.4.5",
     "pg": "^8.23.1",
     "pino-http": "^11.0.0",
