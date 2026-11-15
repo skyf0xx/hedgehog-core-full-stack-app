@@ -42,34 +42,10 @@ Add-ons are not "extra polish"; each is standing infra with a real
 ongoing cost (a service to run, a secret to manage, a seam to keep
 idempotent) that a project without the matching need shouldn't carry.
 
-### Core (every project, no exceptions — see `hedgehog-bootstrap-full-stack-app-core`)
-
-| Layer | Choice |
-|---|---|
-| Monorepo | Nx |
-| Package manager | pnpm |
-| Backend framework | NestJS |
-| ORM | Drizzle (+ `drizzle-zod`) |
-| Database | PostgreSQL |
-| Local infra | Docker Compose (Postgres) |
-| Platform | Railway |
-| API contract | ts-rest |
-| Validation | Zod |
-| Data fetching / hooks | TanStack Query |
-| Web UI | Next.js (frontend only) + ShadCN + Tailwind |
-| Logging | Pino (`nestjs-pino`) |
-| Lint / format | ESLint (flat config) + Prettier (+ `prettier-plugin-tailwindcss`, scoped to `apps/web`) |
-| Testing | Vitest (unit/integration) + Playwright (web e2e) |
-| Commits | Conventional Commits + commitlint + lefthook |
-| Observability | Sentry |
-
-Constraint-contingent substitutions: Prisma for Drizzle when the team
-isn't SQL-comfortable; cloud + Pulumi/SST for Railway when full
-declarative IaC is a hard requirement; tRPC for ts-rest when the client is
-committed TypeScript-only. A substitution here means this core's own
-`workspace/` itself needs regenerating against the substitute before
-this project's Bootstrap runs — not a per-project hand-edit after
-landing core.
+The core stack table, the add-on table and the monorepo layout are owned
+by the root CLAUDE.md's **The constants** section; this skill does not
+restate them. `docs/design` fills in per module during Phase B; nothing
+to scaffold here beyond the empty directory.
 
 ### Add-ons (scaffolded only when planning intake calls for them)
 
@@ -79,51 +55,16 @@ intake's Confirm & Lock (`planner`) and recorded in
 into the sequence below; turning it off means that step is skipped
 entirely, not stubbed or partially wired.
 
-| Add-on | Trigger (from planning intake scope) | Adds |
-|---|---|---|
-| **Auth** | The product has accounts, logins, or per-user data | Better Auth (+ `@thallesp/nestjs-better-auth`, Drizzle adapter), `packages/auth`, a global auth guard on `apps/api`, `BETTER_AUTH_SECRET` in the env schema |
-| **Queue** | At least one operation is genuinely long-running, retried, or fanned out | BullMQ + Redis, `apps/worker`, a `Queue` port/adapter seam, `REDIS_URL` in the env schema, Redis in `docker-compose.yml` |
-| **Mobile** | Mobile is explicitly in scope | Expo + React Native Reusables + NativeWind, `apps/mobile` |
+| Add-on | Trigger (from planning intake scope) |
+|---|---|
+| **Auth** | The product has accounts, logins, or per-user data |
+| **Queue** | At least one operation is genuinely long-running, retried, or fanned out |
+| **Mobile** | Mobile is explicitly in scope |
 
 A project with none of these on is still a full Hedgehog project — Nx,
 NestJS, Postgres, Docker, ts-rest, the phase discipline, and every gate
-still apply (all landed by `hedgehog-bootstrap-full-stack-app-core`). What's cut is
-infra with no consumer, not the discipline itself.
-
-If a project's whole description has no persistent domain data and no
-real lifecycle to model at all (a static marketing page, a one-off
-script, a slide deck) — not "small," but literally no state to carry
-across a schema/contract/service — Hedgehog doesn't apply. `planner`
-checks for this before running BMAD's planning shelf (see that agent's
-opening check) and says so rather than forcing the discipline onto
-something with no domain module in it.
-
-### Monorepo layout
-
-```
-apps/
-  web        (Next.js — UI only)                    core, landed by hedgehog-bootstrap-full-stack-app-core
-  mobile     (Expo — only if the Mobile add-on is on)
-  api        (NestJS — owns all domain logic + DB access)  core, landed by hedgehog-bootstrap-full-stack-app-core
-  worker     (BullMQ consumers — only if the Queue add-on is on)
-
-packages/
-  db         (Drizzle schema + client)                core, landed by hedgehog-bootstrap-full-stack-app-core
-  contracts  (ts-rest + Zod contracts)
-  hooks      (TanStack Query — shared web + mobile)
-  jobs       (typed job registry / queue definitions — only if Queue is on)
-  auth       (Better Auth config — only if Auth is on)
-  config     (locked ESLint/Prettier/tsconfig/env schema)  core, landed by hedgehog-bootstrap-full-stack-app-core
-  shared     (cross-cutting types + utils)
-
-docs/
-  design     (<module>.md per module — `ux-planner` agent output)
-```
-
-`packages/auth` and `packages/jobs` are infra, built once, here (when
-their add-on is on) — not touched again per module. `docs/design` fills in
-per module during Phase B; nothing to scaffold here beyond the empty
-directory.
+still apply (all landed by `hedgehog-bootstrap-full-stack-app-core`).
+What's cut is infra with no consumer, not the discipline itself.
 
 ### Queue add-on: seam in, usage deferred
 
@@ -146,8 +87,7 @@ project. No intents yet, or no `.hedgehog/addons.yaml`: stop and point to
 `planner` rather than guessing which add-ons apply.
 
 Run `hedgehog-bootstrap-full-stack-app-core` first, unconditionally, if it hasn't
-already landed core (check the commit log, or `nx.json` at the repo
-root). That skill has its own re-run guard and Docker check — don't
+already landed core (`nx.json` at the repo root means it has). That skill has its own re-run guard and Docker check — don't
 duplicate those here.
 
 ## Steps (run in sequence, one commit per step that actually runs)
@@ -317,7 +257,7 @@ knows `apps/mobile` exists, so it's where the default widens. Add a
 
 ```json
 "generators": {
-  "hedgehog:screen": {
+  "./tools/generators:screen": {
     "platforms": "web,mobile"
   }
 }
@@ -339,6 +279,7 @@ both that the Nx `mobile` project exists and that its test target is real:
         "apps/web/src/app/{module}/**",
         "apps/mobile/src/{module}/**",
         "apps/mobile/src/app/{module}.tsx",
+        "docs/design/{module}.md",
       ]
     verify: "pnpm nx test web -- src/app/{module}/ && pnpm nx test mobile -- src/{module}/"
     commit: "feat({module}): screen"
