@@ -32,7 +32,7 @@ Examples:
 
 - `pnpm nx run-many -t test -p api web` — test specific projects
 - `pnpm nx run-many -t test --projects=*-e2e` — test projects matching a pattern
-- `pnpm nx run-many -t test --projects=tag:type:service` — test projects by tag (see `hedgehog-loop`'s "Port discipline" for this core's tag scheme)
+- `pnpm nx run-many -t test --projects=tag:type:service` — test projects by tag (see the per-layer `tags` in the root `core.yaml` for this core's tag scheme)
 
 ## Run tasks for affected projects
 

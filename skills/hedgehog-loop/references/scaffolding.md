@@ -1,34 +1,9 @@
 # Scaffolding a layer
 
-Every module in this core goes through the same layer sequence, in order:
-
-```
-schema      (Drizzle)              — types before data
-contract    (Zod / ts-rest)        — the boundary
-repository  (port + Drizzle adapter)
-service     (domain logic)         — imports only ports
-controller  (thin HTTP)
-hook        (TanStack Query)       — Phase B only
-screen      (Next.js / Expo)       — Phase B only
-```
-
-`workspace/core.yaml` declares this as `pattern: vertical-slice` — every
-layer's scope carries `{module}`, so the chain runs once per module,
-independently, joined only at the exclusive `join` layer. Each row below
-is one compiled layer; `backend-eng` builds the Phase A rows (`schema`
-through `controller`), `front-end-eng` builds the Phase B rows (`hook`,
-`screen`), one claimed packet per dispatch — it builds the layer,
-`hedgehog verify` gates and commits it.
-
-| # | Layer | Lives in | Commit |
-|---|---|---|---|
-| 1 | `schema` | `packages/db` (Drizzle) | `feat(<module>): schema` |
-| 2 | `contract` | `packages/contracts` (Zod via `drizzle-zod` + ts-rest) | `feat(<module>): contract` |
-| 3 | `repository` | `libs/<module>/repository` (port + Drizzle adapter) | `feat(<module>): repository` |
-| 4 | `service` | `libs/<module>/service` (domain logic — imports only ports) | `feat(<module>): service` |
-| 5 | `controller` | `apps/api` (thin HTTP, wires contract → service; bundles Queue infra if that add-on is on and this module needs it) | `feat(<module>): api` |
-| 6 | `hook` | `packages/hooks` (TanStack Query) | `feat(<module>): hooks` |
-| 7 | `screen` | `apps/web`, plus `apps/mobile` when the Mobile add-on is on | `feat(<module>): screen-web`, or `feat(<module>): screen` when the Mobile add-on is on |
+Every layer a module goes through (`hedgehog core show` prints the
+sequence, with each layer's scope, verify command and commit message)
+starts from its own generator, and `backend-eng` or `front-end-eng` builds
+the layer from a claimed packet, which prints the exact command for it.
 
 `tools/generators/` holds one Nx generator per layer, and every layer
 starts from its own:

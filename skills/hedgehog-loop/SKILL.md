@@ -5,29 +5,15 @@ description: Use for every unit of work once a Hedgehog project is bootstrapped 
 
 # Hedgehog Loop
 
-The operating loop for a bootstrapped Hedgehog project: `hedgehog claim`
-reserves the packet(s) for ready layers, build them, `hedgehog verify`
-gates and commits each. The build graph (`.hedgehog/hedgehog.db`) is the
-live list — query it via `hedgehog status`/`hedgehog ready`, never
-re-derive state from prose. The step table in the [scaffolding
-reference](references/scaffolding.md) mirrors this core's
-`workspace/core.yaml`, the design source of truth
-for layer order, scope, and verify command per layer — read the table
-for the human-readable shape, and the YAML when they seem to disagree.
-
-The packet, though, is what actually runs. `hedgehog plan` copies each
-layer's scope globs, verify command and commit message onto every task
-row at compile time; from then on the row — not `core.yaml` — is what
-`hedgehog claim` hands out and `hedgehog verify` gates against, and
-editing `core.yaml` afterwards does not reach tasks already compiled (a
-plain `hedgehog plan` re-run won't apply it either — it only reads
-intents still pending). `hedgehog status` prints a **DRIFT** section
-whenever the two have diverged, and `hedgehog plan --recompile` rewrites
-the layer-derived fields on not-yet-started tasks from the current
-`core.yaml`, refusing — and naming — every task already building,
-verifying, complete, or blocked. Never patch a task row in SQLite by
-hand: the DB is derived and gitignored, so `hedgehog db rebuild` drops
-the patch.
+The operating loop for a bootstrapped full-stack-app project. The
+core-neutral cycle (claim, dispatch, verify, debt and decisions, the
+intent check), the Test-depth and review rule, the Friction log, the
+Correction Protocol with its Post-build entry, the Stop Condition, the
+Graph exits, and clearing context are owned by `hedgehog-orchestrating`;
+this skill cites those sections by name and adds only what is specific to
+this core. `hedgehog core show` prints the layer sequence with each
+layer's scope, verify command and commit message; `hedgehog status` and
+`hedgehog ready` are the live list of what is built and what is next.
 
 ## Determine phase
 
@@ -38,17 +24,17 @@ Before touching code, know which phase applies to the module in scope:
   Phase B starts for any of them.
 - **Phase B** — Phase A is closed for the module. Build hooks and screens.
 
-Check `hedgehog status` (or `hedgehog why <path>` for a specific file),
-or the commit log for `feat(<module>): api` commits. No such commit (and
-no `controller` task `complete` for that module) means the module is in
-Phase A.
+Phase A is closed for a module when `hedgehog status` shows its
+`controller` task `complete` (`hedgehog why <path>` names the task behind
+a specific file). Until then the module is in Phase A.
 
 ## The Domain Module Pattern
 
 Root CLAUDE.md's Core rules own "one table = one domain module" and
 "FK-by-ID only" — this section is their mechanics. `users`, `orders`,
-`order_items` are each their own module, carrying the full step sequence
-below. The schema is the source of truth for module boundaries.
+`order_items` are each their own module, carrying the full layer sequence
+`hedgehog core show` prints. The schema is the source of truth for module
+boundaries.
 
 If `orders.user_id` references `users`, the `orders` schema holds a plain
 FK column. The `orders` repository and service depend only on their own
@@ -65,24 +51,15 @@ ports — a service knows related entities only as an ID.
 A junction table (e.g. `order_items`) is one table, one module, with two
 FK-by-ID columns instead of one, each resolved the same way.
 
-Every module goes through the same shape, in order:
-
-```
-schema      (Drizzle)              — types before data
-contract    (Zod / ts-rest)        — the boundary
-repository  (port + Drizzle adapter)
-service     (domain logic)         — imports only ports
-controller  (thin HTTP)
-hook        (TanStack Query)       — Phase B only
-```
-
-This is what `workspace/core.yaml` declares as `pattern: vertical-slice` — every layer's scope carries `{module}`, so the chain above runs once per module, independently, joined only at the exclusive `join` layer.
+`pattern: vertical-slice` in the root `core.yaml` means every layer's
+scope carries `{module}`, so the chain runs once per module,
+independently, joined only at the exclusive `join` layer.
 
 Plus, when an operation needs async **and the Queue add-on is on for this
 project** (check `.hedgehog/addons.yaml`'s `queue.on`): **queue = port +
 BullMQ adapter**, same port/adapter shape as the repository. The service
 imports only ports. Queue is one-time project infra, not a compiled
-layer — `full-stack-app/core.yaml` has no `queue` layer, so this step has
+layer — the root `core.yaml` has no `queue` layer, so this step has
 no `hedgehog verify` gate of its own; build it as part of the
 `controller` layer's packet, verified by that layer's own check. If the
 Queue add-on is off, there's no `apps/worker` and no queue step, full
@@ -97,133 +74,33 @@ What's authored on top is the entity-specific delta: the field list and
 its types, the module's business rules, and the UX intent behind its
 screen.
 
-## Domain Module — Backend and Frontend Steps
+## Who builds what
 
-Each module goes through `schema` → `contract` → `repository` → `service`
-→ `controller` in Phase A, then `hook` → `screen` in Phase B — the same
-sequence "The Domain Module Pattern" above states. Read the [scaffolding
-reference](references/scaffolding.md) for the full step table (layer,
-where it lives, its commit message) and the generator command each layer
-starts from. Delegate each module's Phase A layers to `backend-eng` and
-Phase B layers to `front-end-eng`, one claimed packet per dispatch — it
-builds the layer, `hedgehog verify` gates and commits it. The API is
-complete, typed, and callable (Postman/curl/contract tests) before
-frontend work starts.
+The cycle's dispatch step (`hedgehog-orchestrating`, "The cycle") names
+the agent per layer here: `backend-eng` builds Phase A layers (`schema`
+through `controller`), `front-end-eng` builds Phase B layers (`hook`,
+`screen`), one claimed packet per dispatch, matching the packet's ALLOWED
+SCOPE. The API is complete, typed, and callable (Postman/curl/contract
+tests) before frontend work starts.
 
-Between the `hook` layer's task going `complete` and `front-end-eng`
-starting the `screen` layer, `ux-planner` runs once per module to decide
-"how it should feel" — starting from whatever `planner` filed in
-`docs/design/<module>-notes.md` at planning intake, or the raw UX spec
-directly if that file is absent, or — where the archive holds neither —
-from the contract and hook plus whatever the user supplies when it asks.
-Its first run for a module also signals to the user that Phase B has
-started, and is the point a mockup, screenshot, or export (Google Stitch,
-Figma) can be handed over. It writes `docs/design/<module>.md`, not its
-own compiled layer — the `screen` layer's `hedgehog verify` is what gates
-and commits it.
+Between the `hook` task going `complete` and `front-end-eng` starting the
+`screen` layer, `ux-planner` runs once per module to decide "how it
+should feel", from the UX spec in `.hedgehog/BMAD/05-ux-spec/` or — where
+the archive holds none — from the contract and hook plus whatever the
+user supplies when it asks. Its first run for a module also signals to the
+user that Phase B has started, and is the point a mockup, screenshot, or
+export (Google Stitch, Figma) can be handed over. It writes
+`docs/design/<module>.md`, which is in the `screen` layer's scope, so the
+`screen` layer's `hedgehog verify` gates and commits it.
 
-## The Loop (every unit of work)
+## Core additions to the cycle
 
-1. **Run `hedgehog claim --count N --owner <owner>`.** `<owner>` is this
-   session (a stable id — session id or equivalent). Claim is atomic and
-   lease-based, safe for concurrent claimers, and is the entry point into
-   the loop — `hedgehog next` still exists as a read-only preview of the
-   single next task, but claim is what actually reserves work. `--count
-   N` is a maximum, not a promise: it returns however many tasks are
-   safe to run together right now (the conflict predicate already
-   filtered them against each other), which may be fewer than N, or
-   zero. `hedgehog ready` previews the same decision without claiming
-   anything — CLAIMABLE vs HELD BACK, with the reason for each holdback —
-   useful for understanding the scheduler before committing to a claim.
-2. **For each claimed packet, decide inline vs. dispatch, then act.**
-   Default to dispatching to its own subagent — `backend-eng` (Phase A)
-   or `front-end-eng` (Phase B), matching the packet's ALLOWED SCOPE —
-   in ONE message with parallel tool calls, not one agent call after
-   another. This is a Claude session orchestrating via the Agent tool's
-   parallel-call mechanism: N claimed tasks dispatched this way means N
-   Agent calls in the same message. Build or confirm the packet
-   directly instead, with no subagent, only when the packet clears one
-   of these from the packet alone:
-   - **ALLOWED SCOPE** names a small, bounded set of files the
-     orchestrator can read directly without ballooning its own context.
-   - **RELEVANT RULES or the module name** make the layer's irrelevance
-     checkable in one read — the task's own rules describe a concern
-     that plainly doesn't touch this layer's area.
-   - The change, once its shape is known, is small and mechanical — a
-     rename, an import fix, a one-line registration — rather than
-     something needing a subagent's isolated, fresh-context judgment.
-
-   Escalate to a full `backend-eng`/`front-end-eng` dispatch mid-layer
-   the moment any of these turns out false — a "quick check" that
-   surfaces real cross-file reasoning, an unclear scope, or a diff
-   bigger than expected. Never lock in "inline" once guessed. Either
-   way, the layer's own VERIFICATION command and ALLOWED SCOPE gate
-   apply identically in step 4 — this choice changes who reads, writes,
-   and checks, never what gets checked before it's accepted. A no-op
-   found inline is still reported per the packet's HONESTY rules, never
-   assumed. If a dispatch by name reports the agent as not found —
-   expected right after `init`/`update` installed it this same
-   session — see root CLAUDE.md's "Delegating on this host" note rather
-   than treating it as fatal.
-3. Whoever built the packet — the dispatched agent, or the orchestrator
-   itself when it went inline — **runs typecheck/lint/test on that
-   work** (mirrors lefthook, wired at bootstrap) as a sanity check
-   before reporting back — necessary, not sufficient. Per task: the
-   work is reported as done; the task is not moved and nothing is
-   committed yet.
-4. **As each report arrives, verify it — one at a time, serially.** Run
-   `hedgehog verify <task-id> --owner <owner>` (the same owner that
-   claimed it; verify requires the lease owner). Building happens in
-   parallel; verifying does not — verify writes a commit, and commits go
-   through one at a time. On a scope violation or a failing check, the
-   task moves to `blocked` with a `blocked_reason` of `scope_violation` or
-   `verification_failed`, and nothing downstream unlocks. Fix the work,
-   then run `hedgehog retry <task-id>` to return the task to `planned`,
-   claim it again (by task id — see below), and verify again —
-   `hedgehog verify` only accepts a task you currently hold in
-   `building`, so a blocked task has to go back through `retry` and
-   `claim` first. Don't hand-commit around it.
-
-   A `blocked` task anywhere in the graph — in this module or any other —
-   makes `hedgehog claim --count N` refuse to hand out anything at all,
-   with a non-zero exit naming the blocked task(s). `hedgehog status`
-   lists them too, under NEEDS ATTENTION. Fix and `retry` the named
-   task(s) before claiming more. A **targeted** `hedgehog claim <task-id>
-   --owner <owner>` is exempt — that's how the just-retried task gets
-   reclaimed in the step above. A lease the same `claim` call reaps for
-   having just expired is exempt too: that call still claims whatever
-   else is ready, and the reaped task lands in NEEDS ATTENTION for the
-   next `claim` call to stop on.
-5. **Repeat** — `hedgehog claim --count N --owner <owner>` again for the
-   next batch.
-
-Each claimed packet is the full packet — STATUS/INTENT/RELEVANT
-RULES/INHERITED DEBT/WHY NOW/BLOCKED DOWNSTREAM/ALLOWED
-SCOPE/VERIFICATION — and its **INTENT** block carries the goal and
-outcome of the whole intent, not just this layer's objective. A layer's
-verify command runs the tests that layer wrote, so it measures internal
-consistency, never coverage of what was asked; build the layer's share of
-the goal and say so when the packet doesn't account for something the
-goal asks for. Every per-module layer here has
-its verify radius equal to its own scope by construction (`core.yaml`'s
-own header comment says so) — internally-consistent-only. The real
-integration point is `join`, the workspace-wide `exclusive: true` layer
-that runs the full typecheck and test suite after every module's layers
-land; that is where the real test bar sits on this core. When `hedgehog verify` closes the **last** layer of an
-intent it prints the goal and outcome back as an **INTENT CHECK** — read
-the built work against it there, because nothing else in the build does.
-
-A layer that hits a limitation the next layer must compensate for
-declares it with `hedgehog debt add <task-id> "<note>"`; the note lands
-in the **INHERITED DEBT** section of every packet that depends on that
-task.
-
-Each `hedgehog verify` call commits exactly one layer, built right for
-what's known now; a wrong layer is fixed forward later via the
-Correction Protocol. Valid task statuses are `planned`, `ready`,
-`building`, `verifying`, `complete`, and `blocked`; a task in `blocked`
-also carries a `blocked_reason` (`scope_violation`, `verification_failed`,
-or `lease_expired`).
+- **Verify radius.** Every per-module layer's verify radius equals its own
+  scope (the root `core.yaml`'s header says so), so a layer's verify
+  measures internal consistency only. The real test bar and the `reviewer`
+  pass sit at `join`, the workspace-wide `exclusive: true` layer that runs
+  the full typecheck and test suite after every module's layers land
+  (`hedgehog-orchestrating`, "Test-depth and review rule").
 
 ## Scaffolding a layer
 
@@ -275,86 +152,28 @@ fresh-context session builds module N the same way it built module 1. The
   mechanics inside a service method — those live at the controller /
   adapter edge. A service reads as the business rule and nothing else.
 
+
 ## Friction log
 
-Real friction during a build — an agent's instructions were unclear, a
-redline had to be issued twice for the same underlying gap, the user
-had to correct the same kind of mistake more than once, or user
-feedback implied something was wrong even without a direct correction
-(a preference stated once that, read plainly, means an earlier step
-missed something) — is signal worth keeping past this session, separate
-from the Correction Protocol that fixes it in the moment. Log one entry
-via `hedgehog friction add "<note>" [--task <task-id>]` when that
-happens: what was tried, what went wrong or was implied, why if visible,
-and the commit/message it traces to, all in the note text; pass `--task`
-with the layer's task id when the friction traces to one. This is a log,
-not a todo list — don't let it block or slow the Loop; log and keep
-moving. `tweaker` reads it (via `hedgehog friction list`) once the build
-reaches its Stop Condition.
+`hedgehog-orchestrating`'s "Friction log" section owns the log and its
+mechanics; this core adds nothing to it.
 
 ## Correction Protocol
 
-When a downstream step reveals an upstream step was wrong:
-
-1. **Quiesce.** Dispatch nothing new. Let in-flight tasks finish and
-   verify normally — do NOT kill running subagents. Release anything
-   claimed but not yet started (`hedgehog release <task-id> --owner
-   <owner>`).
-2. Once nothing is in flight (`hedgehog quiesce` exits 0), patch the
-   upstream step directly, in place. Before editing, run the LSP tool's
-   findReferences/incomingCalls against the symbol being changed to see
-   what already depends on it — the blast radius a stale mental model
-   would otherwise miss.
-3. Fast-forward every dependent step that breaks, each its own small
-   commit. If the patched step lives in a workspace package (e.g.
-   `packages/hooks`, `packages/contracts`) that a running `web`/`mobile`
-   dev server consumes, run that package's `nx run <pkg>:build` before
-   re-verifying — the dev server resolves the package's built `dist/`,
-   not its `src/`, so an unbuilt patch looks unchanged to anything
-   downstream even though the source is fixed.
-4. The commit messages are the explanation.
-5. Resume — `hedgehog claim` again.
-
-Quiescing is correct, not a cautious fallback. The conflict predicate
-already guarantees a correction cannot collide with in-flight work: if
-the correction's scope conflicted with something currently building, the
-scheduler would not have co-scheduled it in the first place. Letting
-in-flight tasks finish and verify rather than killing them costs nothing
-and throws away no progress.
-
-The orchestrating session runs this protocol. A phase-owning agent that
-hits the problem reports it rather than correcting across steps: the
-commits at step 3 are the session's act, the same way `hedgehog verify`
-always is.
-
-Use `conventional-commits` when a correction touches several steps in one
-working-tree pass and needs splitting back into per-step commits.
-
-### Post-build entry
-
-The protocol also runs after a build has reached its Stop Condition, when
-a `tweaker` session finds that something structural is wrong rather than
-something small (`tweaker` routes it here). Steps 2, 3, and 4 are
-unchanged. The two ends differ:
-
-- There is nothing to **quiesce** — no task is in flight. Start by naming
-  which committed step was wrong and what revealed it.
-- There is no loop to **resume**: every task is already `complete`, so
-  `hedgehog claim` has nothing to claim. Return to the `tweaker` session
-  instead.
-
-Every task the correction touches is already `complete` and stays that
-way — a correction is fixed forward in new commits, never by reopening a
-finished task. Verify each patched step by running that step's own verify
-command directly. Log the correction with `hedgehog friction add` so the
-next friction review sees what the build got wrong.
+`hedgehog-orchestrating`'s "Correction Protocol" section owns the steps
+(including its "Post-build entry" for a structural fault found after the
+Stop Condition). One addition on this core: if the patched layer lives in
+a workspace package (e.g. `packages/hooks`, `packages/contracts`) that a
+running `web`/`mobile` dev server consumes, run that package's `nx run
+<pkg>:build` before re-verifying anything downstream — the dev server
+resolves the package's built `dist/`, not its `src/`, so an unbuilt patch
+looks unchanged to anything downstream even though the source is fixed.
 
 ## Phase Transition Checks
 
 Before starting Phase B for a module, confirm:
 
-- `hedgehog status` shows that module's `controller` task `complete`
-  (equivalently, a `feat(<module>): api` commit exists).
+- `hedgehog status` shows that module's `controller` task `complete`.
 - The contract is callable and typed (contract tests pass).
 
 Use the `reviewer` agent for this — it checks what the mechanical gate
@@ -385,8 +204,8 @@ full-stack-app phase boundary:
   will need, or does it leak implementation detail that will force a
   breaking change once hooks are built against it?
 - **Phase leakage**: any hook or screen code, or frontend-shaped
-  reasoning, showing up before this module has a `feat(<module>): api`
-  commit?
+  reasoning, showing up before this module's `controller` task is
+  `complete`?
 - **Queue seam**: if the Queue add-on is on and queue infra was added,
   does the operation genuinely need async (long-running, retries,
   fan-out) — or was the seam reached for out of habit? If the Queue
@@ -403,8 +222,9 @@ full-stack-app phase boundary:
   errors — same bar any reviewer would apply, scoped to what's new since
   the last review point.
 
-The review point is the last `feat(<module>): api` commit; `git diff`
-from there, then read every layer of the module rather than the diff
+The review point is the commit that closed the module's `controller`
+task (`hedgehog why <a controller file>` names it); `git diff` from
+there, then read every layer of the module rather than the diff
 alone — boundary violations are invisible from a diff.
 
 Before starting Phase A for a module, confirm it's inside the stated scope
@@ -412,6 +232,7 @@ boundary from planning intake (`planner`). If not, stop and ask — and if
 the answer is that the scope really should grow, that's `planner`'s
 Re-entry pass, which adds it to the graph properly. Don't build a module
 the graph doesn't have a task for.
+
 
 ## Rules
 
@@ -430,65 +251,14 @@ the graph doesn't have a task for.
 - A module's frontend code (hook, screen) is built after its API is
   committed.
 - The screen step doesn't start blank — `ux-planner` runs once per module,
-  after the hook is committed, before `front-end-eng` starts the screen.
+  after the hook task is `complete`, before `front-end-eng` starts the
+  screen.
 - `packages/config` is the single source for shared config (root
   CLAUDE.md's Core rules).
 
 ## Stop Condition
 
-A build session ends when `hedgehog status` shows every task for every
-module in scope `complete` (Phase A and Phase B both closed), or when
-scope is ambiguous enough that continuing means guessing — ask one
-question and wait.
-
-On the former (a real build completion, not an ambiguity stop), offer a
-fresh-context handoff before doing anything else: tell the user the
-build is complete, and that clearing context now costs nothing. The
-permanent record is the committed intents, friction log, root
-`core.yaml` (the shipped core definition — not `.hedgehog/core.yaml`,
-which only exists on an authored core), and the commit history itself —
-not `.hedgehog/hedgehog.db`, which is
-gitignored and derived, rebuildable at any time via `hedgehog db
-rebuild`. That's what makes the next session cheap.
-
-Before offering that handoff, run `hedgehog boundary` and only declare
-the Stop Condition met once it exits 0. Every task showing `complete` is
-not sufficient on its own: a lease can be outstanding without a visible
-status change, and the working tree can still hold uncommitted work.
-`boundary` checks all three — nothing in flight, clean tree, last closed
-task completed its intent — and names which one failed when it exits
-non-zero. `hedgehog quiesce` covers only the first of the three; it is
-the right check mid-correction, not the right check for a handoff.
-
-The same command answers the mid-build question the project instructions
-file's **Managing context** section depends on: whether *this* moment,
-not just the end of the build, is one to clear the conversation at. Run
-it at any point you're considering `/clear`, and start the next session
-from `hedgehog boundary --handoff`, which prints where the build is,
-what's next and why, and what's blocked, straight from the graph.
-
-Name **both** ways forward, because which one applies depends on what the
-user wants next:
-
-- **Adjustments to what's built** — a `tweaker` session, in a *new* chat
-  window, not a subagent call inside this one — this session's context
-  has been building the whole project and is exactly what "clearing
-  context now costs nothing" above means to discard. Tell the user
-  plainly: close this chat window and open a new one, then paste this to
-  start it:
-
-  > The build is complete. Use the tweaker agent: first review the
-  > friction log and ask me for feedback on the build, then take my
-  > tweak requests one at a time.
-
-  In the new window, `tweaker` starts clean, reviews the friction log
-  (`hedgehog friction list`) once for a possible discipline-improvement
-  suggestion, and takes tweak requests one at a time from there.
-- **New scope** — a new module, a new feature, anything beyond adjusting
-  what exists — goes to `planner`, which runs
-  `hedgehog-planning-intake`'s Re-entry pass: it adds intents for the new
-  work without re-running planning from scratch, and without disturbing
-  anything already built. A completed build is extendable, not sealed.
-
-Don't start making tweaks or planning new scope in the current,
-already-large context; that's what the fresh session is for.
+`hedgehog-orchestrating`'s "Stop Condition" section owns the stop, the
+`hedgehog boundary` check, and the handoff to `tweaker` (adjustments) or
+`planner` (new scope). On this core, new scope is a new module or feature
+and goes to `planner`'s Re-entry pass.
