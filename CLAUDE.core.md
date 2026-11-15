@@ -19,9 +19,10 @@ steps from memory:
 - **`hedgehog-loop`** — every unit of work once bootstrapped: `hedgehog
   claim` reserves the packet for one ready layer (`hedgehog next` previews
   it read-only, without reserving), build exactly one, gate it via
-  `hedgehog verify`, which commits it on a pass. Also holds the Correction
-  Protocol for fixing a wrong upstream step. Invoke it at the start of any
-  build session and for "what's next".
+  `hedgehog verify`, which commits it on a pass. Cites
+  `hedgehog-orchestrating` for the claim/verify cycle and the Correction
+  Protocol, and holds this core's layer conventions and phase checks.
+  Invoke it at the start of any build session and for "what's next".
 <!-- hedgehog:bootstrap-only start -->
 - **`hedgehog-bootstrap`** — run **once**, at project start, to scaffold
   the core stack, the enforcement config, and whichever add-ons (Auth,
@@ -93,7 +94,7 @@ packages/
 libs/
   <module>/port · <module>/repository · <module>/service   (one triplet per table)
 .hedgehog/
-  hedgehog.db    the build graph — intents, tasks, dependencies, verifications, committed to git
+  intents/       the committed intent records; hedgehog.db, the build graph, is gitignored and rebuilt from them (`hedgehog db rebuild`)
   addons.yaml    the Add-ons decision (Auth/Queue/Mobile), from planner
   BMAD/          archival planning intake output (brief, PRD, UX spec, research) — write-once, from planner
 docs/
@@ -111,8 +112,8 @@ docs/
   (hooks → screen) opens. Enforced by the CI phase gate.
 - **Sequential within a phase.** A step starts only once the previous one
   compiles and passes tests.
-- **One step = one commit**, in the exact Conventional Commit format from
-  `hedgehog-loop`. A commit that fails typecheck/lint/test does not happen
+- **One step = one commit**, in the exact Conventional Commit format each
+  layer's `commit` field carries (`hedgehog core show`). A commit that fails typecheck/lint/test does not happen
   (lefthook gate).
 - **Fix wrong steps at the source** via the Correction Protocol — never a
   downstream workaround.

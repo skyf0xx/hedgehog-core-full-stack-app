@@ -29,7 +29,7 @@ pnpm nx show projects
 pnpm nx show projects --projects "apps/*"
 pnpm nx show projects --projects "packages/*"
 
-# Filter by tag (see `hedgehog-loop`'s "Port discipline" for this core's
+# Filter by tag (see the per-layer `tags` in the root `core.yaml` for this core's
 # type:service/type:adapter tag scheme)
 pnpm nx show projects --projects "tag:type:service"
 pnpm nx show projects -p 'tag:type:service,!tag:type:adapter'

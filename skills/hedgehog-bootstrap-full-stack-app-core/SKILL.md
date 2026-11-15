@@ -38,8 +38,8 @@ Everything under this package's `workspace/`, copied to the repo root:
   `tsconfig.base.json`, `pnpm-lock.yaml`, and `core.yaml` — the shipped
   layer sequence `hedgehog plan`/`verify`/`next` read for this project.
   This root `core.yaml` is a different file from `.hedgehog/core.yaml`,
-  which only exists on an authored core (see `hedgehog-core-design`) —
-  the two never coexist on the same project.
+  which only exists on an authored core — the two never coexist on the
+  same project.
 - `packages/config/` — `eslint-base.js`, `prettier.js` (no
   `prettier-plugin-tailwindcss` — that's `apps/web`'s own config, already
   wired), `env.schema.ts` (core fields only: `DATABASE_URL`, `NODE_ENV`,
@@ -56,7 +56,7 @@ Everything under this package's `workspace/`, copied to the repo root:
   `experimentalDecorators`/`emitDecoratorMetadata` for `Test.createTestingModule`),
   with a smoke test (`app.module.spec.ts`) instantiating `AppModule`.
   `apps/api/src/app/feature-modules.ts` is a generated barrel — see
-  **The controller barrel** below — that `AppModule` imports and spreads
+  **Generated barrels** below — that `AppModule` imports and spreads
   into its `imports`, so no domain module's controller layer ever edits
   `app.module.ts`. Depends on `packages/db` (the controller layer imports
   it by construction). `apps/api-e2e` already converted to Vitest with an
@@ -95,79 +95,33 @@ Everything under this package's `workspace/`, copied to the repo root:
 from the committed `pnpm-lock.yaml`, which is a fast resolve against a
 locked graph, not a fresh solve.
 
-## The controller barrel
+## Generated barrels
 
-`apps/api/src/app/app.module.ts` never takes a per-module edit.
-`core.yaml`'s controller layer scope is `apps/api/src/app/{module}/**` —
-module-disjoint by construction, so two modules' controller tasks never
-touch the same file — but `app.module.ts` itself sits outside every
-module's scope, and `src/db/core.mjs`'s `validateCore` rejects a
-non-exclusive layer whose scope omits `{module}` on a module-axis core,
-so the controller layer's scope can't be widened to include it either. A
-file two concurrent module builds both hand-edited would also be
-invisible to the scheduler's conflict check (`src/db/conflict.mjs` only
-compares each task's own declared scope globs), so even a single shared
-line to append to would race undetected.
+Two files are generated, never hand-edited, so no module's layer touches a
+file outside its own scope:
 
-`apps/api/src/app/feature-modules.ts` solves this by never being
-hand-edited at all: `tools/generate-feature-modules.cjs` globs
-`apps/api/src/app/*/*.module.ts` and writes it as a generated barrel — a
-literal `import { XModule } from './x/x.module'` per domain module found,
-plus an exported `featureModules` array — every time the
-`generate-feature-modules` Nx target runs. `AppModule` imports that one
-generated file and spreads `featureModules` into its own `imports`. A
-module's controller layer only ever creates its own `{module}.module.ts`
-inside its own `apps/api/src/app/{module}/` directory — always in scope,
-never colliding with any other module's controller task. In the shipped
-core, no domain module exists yet, so the glob finds nothing and
-`feature-modules.ts` exports an empty array.
+- `apps/api/src/app/feature-modules.ts` — written by
+  `tools/generate-feature-modules.cjs` from every
+  `apps/api/src/app/*/*.module.ts`; `AppModule` spreads its
+  `featureModules` array into `imports`. A module's controller layer only
+  creates its own `{module}.module.ts`. The `generate-feature-modules` Nx
+  target runs ahead of `build`, `test` and `typecheck`. The imports are
+  literal rather than a runtime directory scan, because `apps/api` bundles
+  by walking `main.ts`'s static import graph.
+- `apps/web/src/app/module-routes.ts` — written by
+  `tools/generate-module-routes.cjs` from every
+  `apps/web/src/app/*/page.tsx` (route groups and `_`/`.`-prefixed
+  directories skipped); the root page renders a link per entry. A module's
+  screen layer only creates its own `page.tsx`. The `generate-module-routes`
+  Nx target runs ahead of `build`, `dev`, `test` and `typecheck`.
 
-`generate-feature-modules` is wired as an explicit Nx target on `apps/api`
-(`apps/api/package.json`'s `nx.targets`), cached, with `build` declaring
-it as a `dependsOn`; `test` and `typecheck` pick it up the same way
-through `nx.json`'s `targetDefaults` (a project with no matching target,
-such as `db` or `web`, silently skips a missing `dependsOn` entry rather
-than failing). Static imports rather than a runtime directory scan:
-`apps/api` builds through `NxAppWebpackPlugin`, which bundles by
-statically walking `main.ts`'s import graph — a file never reached by a
-static `import`/`require` is dropped from the bundle entirely, so a
-runtime `fs.readdirSync` scan for sibling files would find nothing in the
-built output even though the same scan works when Vitest runs the same
-source directly. Generating literal imports keeps both paths identical.
-
-## The route index
-
-`apps/web/src/app/page.tsx` is the same category of file on the web side,
-and gets the same answer. The screen layer's scope is
-`apps/web/src/app/{module}/**`, module-disjoint and — by the same
-`validateCore` rule — unable to be widened to reach one level up, so the
-root page is outside every layer's scope. Left to itself it can never
-learn about the modules built beneath it, and a finished build ships a
-landing page with no route into the app it just built.
-
-`tools/generate-module-routes.cjs` globs `apps/web/src/app/*/page.tsx`
-and writes `apps/web/src/app/module-routes.ts` — an exported
-`moduleRoutes` array of `{ href, label }`, one per route directory found,
-skipping Next.js route groups (`(group)`) and `_`/`.`-prefixed
-directories, which are not routes. The root page imports that one
-generated file and renders a link per entry, or a short "no modules yet"
-line when the array is empty, which is what the shipped core has. A
-module's screen layer only ever creates its own `page.tsx` inside its own
-`apps/web/src/app/{module}/` directory — always in scope — and nothing
-ever hand-edits the root page or the generated file.
-
-`generate-module-routes` is wired as an explicit Nx target on `apps/web`
-(`apps/web/package.json`'s `nx.targets`), cached, with `build`, `dev`,
-`test` and `typecheck` picking it up through `nx.json`'s `targetDefaults`
-the same way its API sibling does.
+With no domain module yet, both files export empty arrays.
 
 ## Steps
 
 ### 1. Confirm this hasn't already run
 
-Check for `nx.json` at the repo root, or a prior
-`feat(config): workspace + shared config` commit
-(`git log --grep="^feat(config): workspace"`). Either means core already
+Check for `nx.json` at the repo root. Present means core already
 landed — stop, don't re-copy. If something about the landed core seems
 wrong, that's a Correction Protocol case (`hedgehog-loop`), not a
 re-copy: patch the specific file at its source.
@@ -267,119 +221,16 @@ into `node_modules/`) rather than a global Homebrew-installed shadow.
 feat(config): workspace + shared config
 ```
 
-One commit for all of core, landed as a verified copy. That commit
-existing is the record that core landed — `bootstrap` checks for it via
-the commit log, not a checklist line.
-
-## Known issues baked into the full-stack-app core
-
-These are already fixed in the committed tree — listed here so anyone
-regenerating `workspace/` (see `scripts/regenerate-full-stack-app-core.sh`
-in this package) knows why the tree looks the way it does, and doesn't
-reintroduce the bug by "cleaning up" what looks like an unnecessary pin
-or directive.
-
-- **`tsconfig.base.json` uses `esnext`/`bundler` module resolution, not
-  `nodenext`.** Turbopack (Next 16's dev bundler) can't resolve a
-  `nodenext`-style `.js`-extension relative import specifier (`export *
-  from './tasks/index.js'` where only `index.ts` exists) across a pnpm
-  workspace-package boundary — `apps/web` importing a runtime value
-  (not just a type) from `packages/hooks`, `packages/contracts`, or
-  `packages/db` 500s with `Module not found`. `bundler` is TypeScript's
-  mode for exactly this case and is Next's own tsconfig default; nothing
-  in this stack runs raw `tsc` output directly with Node (`apps/api`
-  builds via `webpack-cli`, `apps/web` via Next/Turbopack, tests via
-  Vitest), so `nodenext`'s stricter runtime-accurate extension
-  enforcement isn't load-bearing anywhere here. Every relative import
-  specifier across the template is extensionless accordingly — a
-  `schema`/`contract`/`hook` layer adding a new barrel re-export must
-  match (`export * from './tasks/index'`, not `'./tasks/index.js'`).
-- **`packages/db/src/schema/index.ts` needs `export {};`.** It's an
-  empty barrel-of-barrels (see the schema layer's scope in `core.yaml`)
-  until the first module's schema layer adds a line to it, but a
-  comment-only file with zero import/export statements compiles as an
-  ambient script, not a module, under `isolatedModules` +
-  `declaration`/`composite`. `packages/db/src/index.ts`'s `export *
-  from './schema/index'` fails `db:typecheck` (`TS2306: File ... is not
-  a module`) without it.
-- **`apps/web/package.json` needs `"nx": { "tags": ["scope:web"] }`.**
-  `packages/config/eslint-base.js`'s `depConstraints` already defines a
-  `sourceTag: 'scope:web'` rule, but `@nx/next:app` doesn't tag the
-  project it generates — an untagged project is barred from depending on
-  any tagged library at all under `@nx/enforce-module-boundaries`, so
-  `apps/web` fails lint on its first import from any workspace package
-  without this.
-- **`apps/web-e2e/tsconfig.json` needs an explicit `"types": ["node"]`.**
-  `@nx/next:app`'s generated Playwright config (`playwright.config.mts`)
-  uses `process.env` and `import.meta.dirname`, but the generator's
-  `tsconfig.json` for `apps/web-e2e` has no `types` array — unlike
-  `apps/api-e2e`'s Vitest config, which explicitly lists `node` among
-  its types. Without it, `nx run web-e2e:typecheck` fails with
-  `TS2591`/`TS2339` on both. Add `"types": ["node"]` to
-  `compilerOptions` there.
-- **`prettier-plugin-tailwindcss` must stay pinned to `^0.7.4`, not
-  `^0.8.x`.** `0.8.0+` made `parser.preprocess` async, but Prettier core
-  calls it synchronously — crashes with `TypeError: e.charAt is not a
-  function` on every `.ts`/`.tsx` file, independent of Tailwind config,
-  module format, or Nx/pnpm. `0.7.4` fully supports Tailwind v4's
-  `tailwindStylesheet` option, so nothing is lost by staying on it.
-  Re-check this pin when bumping the plugin.
-- **Tailwind v4 needs `tailwindStylesheet` set explicitly in
-  `apps/web/.prettierrc.js`.** There's no `tailwind.config.js` for the
-  plugin to autodetect under v4 — point it at
-  `./src/app/global.css` (the file with `@import 'tailwindcss'`),
-  resolved relative to the `.prettierrc.js` file itself.
-- **Any component that imports Radix's `Slot` (the `asChild` pattern —
-  e.g. `components/ui/button.tsx`) needs `'use client'` as its first
-  line, even if a given render path never actually sets `asChild`.**
-  `Slot` calls `React.createContext` at module scope, which crashes
-  Server Component builds (`TypeError: e.createContext is not a
-  function`) purely on import. Verify with a clean `.next`/Nx cache
-  (`rm -rf apps/web/.next .nx/cache`) — a warm cache can mask this.
-- **`apps/web/package.json` needs `"type": "module"`, same reasoning as
-  the root `package.json`** — `apps/web/.prettierrc.js`
-  is ESM (`export default`), and without a matching `"type": "module"`
-  Node emits a `MODULE_TYPELESS_PACKAGE_JSON` warning on every prettier
-  invocation touching that directory.
-- **`apps/api`'s dev port defaults to 3333, not 3000.** `apps/web`'s
-  `next dev` also defaults to port 3000, and the root `dev` script runs
-  both side by side (`nx run-many --target=serve,dev
-  --projects=api,web`). If `apps/api/src/main.ts` ever falls back to
-  `process.env.PORT || 3000`, whichever process binds the port second
-  either crashes or is silently unreachable, and every API call from the
-  web client 404s against Next's own dev server instead (Next has no
-  matching route, so it serves its catch-all 404 page rather than a
-  connection error — easy to mistake for a routing bug in the api
-  itself). Keep `apps/api`'s fallback at `3333` and don't let it drift
-  back to matching Next's default.
-- **`apps/web/vitest.config.mts` needs `environment: 'jsdom'`, the
-  `@vitejs/plugin-react` plugin, and the `@/*` -> `./src/*` alias resolved
-  explicitly.** `@nx/next:app --unitTestRunner=vitest` generates a
-  Node-flavored config with no JSX plugin and no alias resolution — wrong
-  for a React app, and Vitest doesn't read `tsconfig.json`'s `paths` on
-  its own. `apps/web/src/test-setup.ts` (loading
-  `@testing-library/jest-dom/vitest`) is wired as the config's
-  `setupFiles` entry so `toBeInTheDocument()` and friends resolve in every
-  spec without a per-file import.
-- **No `NODE_ENV=production` build-target override needed** (Nx
-  23.1.0, Next 16.1.7). Targets are inferred from
-  `package.json`/`next.config.js` via the `@nx/next` plugin, with no
-  per-app `project.json` to override. If a future Nx/Next bump ever
-  produces a dev-mode production build crash
-  (`web:build` succeeds but crashes prerendering `/_global-error` with a
-  React-internals error), set `NODE_ENV=production` explicitly on
-  `apps/web`'s `build` target as the fix.
+One commit for all of core, landed as a verified copy.
 
 ## If verification fails
 
 A clean copy of `workspace/` that fails typecheck/lint/test or needs a
 lockfile change means the shipped template itself is broken — not a
 per-project problem to hand-patch around. Stop and report exactly what
-failed (which target, which error). Fixing this means updating
-`workspace/` at its source (via `scripts/regenerate-full-stack-app-core.sh`
-in this package) and shipping a new package version — never patch a
-consuming project's copy to route around a broken template and call core
-done.
+failed (which target, which error). The template is fixed upstream and shipped as a
+new package version — never patch a consuming project's copy to route
+around a broken template and call core done.
 
 ## Local infra: Docker, always
 

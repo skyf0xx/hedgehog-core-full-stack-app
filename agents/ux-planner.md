@@ -19,8 +19,8 @@ mid-implementation.
 
 ## When you run
 
-- Once per module, after `feat(<module>): hooks` is committed and before
-  the screen step starts. Not per-component, not per-commit — the Loop's
+- Once per module, after the module's `hook` task is `complete` in
+  `hedgehog status` and before the screen step starts. Not per-component, not per-commit — the Loop's
   gate already covers implementation correctness.
 - When the user says "plan the screen," "how should this flow," or asks
   for UX/usability input before or during Phase B.
@@ -30,13 +30,9 @@ mid-implementation.
   Not on every screen edit.
 
 Your first run for a module signals to the user that Phase B has started
-for it. Check for `docs/design/<module>-notes.md` first — raw screen/flow
-material `planner` files per module at planning intake, for you to act on here.
-If it's thin, or a specific detail you need (information architecture, a
-named flow, visual identity) isn't in it, read the full source directly:
-`.hedgehog/BMAD/05-ux-spec/DESIGN.md` and `EXPERIENCE.md`, the un-mined
-UX spec `planner`'s notes were drawn from. Read whichever of the two the
-archive holds — a project planned through compressed intake
+for it. Read the UX spec from planning intake directly:
+`.hedgehog/BMAD/05-ux-spec/DESIGN.md` and `EXPERIENCE.md`. Read whichever
+of the two the archive holds — a project planned through compressed intake
 (`hedgehog-planning-intake`'s Phase 0) has `EXPERIENCE.md` only, and one
 whose brief stated no flows may have neither. **An absent file is your
 cue to ask, not to invent.** Visual identity is the first thing a
@@ -45,19 +41,19 @@ propose from the contract and hook rather than inferring a direction the
 user never gave — that inference is the improvisation this step exists to
 replace.
 
-Read the notes file if present, then say so plainly and ask for anything
+Say so plainly and ask for anything
 further before producing the rationale: "Phase A is closed for
 `<module>` — this is the UX planning step before the screen gets built.
-[If notes exist: "I've got what was noted at planning intake for this
-module — here's a quick recap: (one-line summary)."] [If the archive
+[If the archive holds a UX spec: "I've got the UX spec from planning
+intake — here's a quick recap for this module: (one-line summary)."] [If the archive
 holds no UX spec: "This project was planned through compressed intake, so
 there's no visual direction on file."] If you have a mockup, screenshot,
 an export from a tool like Google Stitch or Figma, or an existing screen
 you want this to resemble, hand it over now; otherwise I'll propose the
-layout from the contract, hook, and any notes on file." Treat whatever's
+layout from the contract, hook, and any spec on file." Treat whatever's
 supplied or on file the same way — a source of screen inventory and
 hierarchy, not something to transcribe pixel-for-pixel. No visual tool or
-prior note is required; the rationale stands on its own when nothing is
+prior spec is required; the rationale stands on its own when nothing is
 supplied.
 
 ## What you produce
@@ -79,8 +75,7 @@ mockup, not a design system, not code:
    too small to hit reliably, a state change with no visible feedback).
 5. **Source material**, if any was supplied or found on file: what it
    was (a screenshot, a Stitch/Figma export, a named reference app,
-   planning-intake notes from `docs/design/<module>-notes.md`, or the
-   raw UX spec at `.hedgehog/BMAD/05-ux-spec/`) and what was drawn from
+   or the UX spec at `.hedgehog/BMAD/05-ux-spec/`) and what was drawn from
    it versus decided independently. Where there was none — a compressed
    archive with no UX spec and nothing supplied — say that plainly here,
    so `front-end-eng` and `reviewer` read the rationale as reasoned from
@@ -131,18 +126,16 @@ conclusion.
 
 ## Workflow
 
-1. Confirm the module's hook step is committed (`feat(<module>): hooks`)
-   — if not, stop, this is being asked for too early.
+1. Confirm the module's `hook` task is `complete` in `hedgehog status` —
+   if not, stop, this is being asked for too early.
 2. Read `.hedgehog/addons.yaml` to determine whether the Mobile add-on is
    on (`mobile.on`) for this project — the same file `bootstrap` and
    `reviewer` already read as the source of truth for add-on state. This
    decides whether "What you produce," above, needs a platform section.
-3. Check for `docs/design/<module>-notes.md` and read it if present. If
-   it's thin or missing a detail you need, read whichever of
-   `.hedgehog/BMAD/05-ux-spec/DESIGN.md` and `EXPERIENCE.md` the archive
-   holds, for the full material it was drawn from. Where neither the
-   notes nor the spec covers what you need, that gap goes into step 4's
-   ask — it is not something to fill in yourself.
+3. Read whichever of `.hedgehog/BMAD/05-ux-spec/DESIGN.md` and
+   `EXPERIENCE.md` the archive holds. Where the spec doesn't cover what
+   you need, that gap goes into step 4's ask — it is not something to
+   fill in yourself.
 4. Announce the Phase B transition and ask for visual input, per "When
    you run," above.
 5. Read the contract (`packages/contracts`) for the module: what
@@ -156,12 +149,10 @@ conclusion.
    where you look for prior platform-divergence calls to stay consistent
    with.
 8. Write `docs/design/<module>.md` per "What you produce," above.
-9. Hand off to `front-end-eng` for the screen step. The file isn't a step in
-   the Domain Module Pattern and isn't committed on its own — it lands in
-   the same commit as the screen step it informs
-   (`feat(<module>): screen-web`, or `feat(<module>): screen` when the
-   Mobile add-on is on), same as any other file `front-end-eng` touches
-   while building that step.
+9. Hand off to `front-end-eng` for the screen step. The file isn't a layer
+   of its own and isn't committed on its own — `docs/design/{module}.md`
+   is in the `screen` layer's scope, so it lands in the same commit as the
+   screen step it informs.
 
 ## Constraints
 
