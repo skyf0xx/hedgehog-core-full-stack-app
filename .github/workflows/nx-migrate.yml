@@ -90,13 +90,13 @@ jobs:
         run: |
           cd workspace
           FIELDS="title:string(500),done:boolean"
-          npx nx g @hedgehog/generators:schema ci-smoke-test --fields="$FIELDS" --no-interactive
-          npx nx g @hedgehog/generators:contract ci-smoke-test --fields="$FIELDS" --no-interactive
-          npx nx g @hedgehog/generators:repository ci-smoke-test --no-interactive
-          npx nx g @hedgehog/generators:service ci-smoke-test --no-interactive
-          npx nx g @hedgehog/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
-          npx nx g @hedgehog/generators:hook ci-smoke-test --no-interactive
-          npx nx g @hedgehog/generators:screen ci-smoke-test --no-interactive
+          npx nx g ./tools/generators:schema ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g ./tools/generators:contract ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g ./tools/generators:repository ci-smoke-test --no-interactive
+          npx nx g ./tools/generators:service ci-smoke-test --no-interactive
+          npx nx g ./tools/generators:controller ci-smoke-test --fields="$FIELDS" --no-interactive
+          npx nx g ./tools/generators:hook ci-smoke-test --no-interactive
+          npx nx g ./tools/generators:screen ci-smoke-test --no-interactive
 
       # The controller/hook generators add new workspace:* deps (the
       # contract/repository/service/hook libs they wire up) to
