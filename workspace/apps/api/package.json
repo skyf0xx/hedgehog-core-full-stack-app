@@ -118,7 +118,7 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.2",
     "tslib": "^2.9.1",
-    "nestjs-pino": "^4.6.1",
+    "nestjs-pino": "^5.3.1",
     "pino-http": "^11.0.0",
     "config": "workspace:*",
     "db": "workspace:*"
